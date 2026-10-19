@@ -1,0 +1,4 @@
+{"ts": "2026-10-19T10:00:00Z", "event": "login", "user": "ada"}
+{"ts": "2026-10-19T10:01:12Z", "event": "upload", "user": "ada", "bytes": 1048576}
+
+{"ts": "2026-10-19T10:05:40Z", "event": "logout", "user": "ada"}

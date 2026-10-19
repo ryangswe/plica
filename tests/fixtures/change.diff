@@ -1,0 +1,21 @@
+diff --git a/src/greet.py b/src/greet.py
+index 3b18e51..a9c2f1d 100644
+--- a/src/greet.py
++++ b/src/greet.py
+@@ -1,5 +1,6 @@
+ def greet(name):
+-    return "Hello " + name
++    """Say hello."""
++    return f"Hello, {name}!"
+ 
+ 
+ print(greet("world"))
+diff --git a/README.md b/README.md
+index 1111111..2222222 100644
+--- a/README.md
++++ b/README.md
+@@ -10,3 +10,3 @@ Intro
+ ## Usage
+-Run it.
++Run it with `python greet.py`.
+ Done.

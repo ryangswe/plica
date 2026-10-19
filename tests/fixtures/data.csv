@@ -1,0 +1,7 @@
+id,name,language,stars,created
+1,marked,JavaScript,33000,2011-07-24
+2,ripgrep,Rust,50000,2016-03-11
+3,"pandas, the library",Python,44000,2010-08-24
+4,tauri,Rust,90000,2019-07-13
+5,vite,TypeScript,70000,2020-04-21
+10,jq,C,31000,2012-07-18

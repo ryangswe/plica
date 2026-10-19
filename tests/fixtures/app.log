@@ -1,0 +1,10 @@
+2026-10-19 10:00:00.120 INFO  server: listening on :8080
+2026-10-19 10:00:01.004 DEBUG db: pool size=10
+2026-10-19 10:00:03.551 WARN  http: slow request GET /api/users took 2300ms
+2026-10-19 10:00:04.002 ERROR worker: job 42 failed
+java.lang.IllegalStateException: boom
+    at com.example.Worker.run(Worker.java:42)
+    at java.base/java.lang.Thread.run(Thread.java:833)
+2026-10-19 10:00:05.000 INFO  worker: retrying job 42
+[32mgreen ansi line[0m with [1;31mbold red[0m
+2026-10-19 10:00:06.000 INFO  worker: job 42 done

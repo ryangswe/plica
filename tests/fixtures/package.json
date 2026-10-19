@@ -1,0 +1,12 @@
+{
+  "name": "example",
+  "version": "1.2.3",
+  "private": true,
+  "scripts": { "dev": "vite", "build": "vite build" },
+  "dependencies": { "marked": "^18.0.0", "dompurify": "^3.0.0" },
+  "contributors": [
+    { "name": "Ada", "url": "https://example.com/ada", "active": true, "commits": 120 },
+    { "name": "Grace", "url": null, "active": false, "commits": 7 }
+  ],
+  "nested": { "a": { "b": { "c": { "d": "deep" } } } }
+}

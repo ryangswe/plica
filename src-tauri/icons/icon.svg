@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f6feb"/>
+      <stop offset="1" stop-color="#1f4fbf"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <!-- page with a folded corner -->
+  <path d="M300 220 h300 l140 140 v444 a40 40 0 0 1 -40 40 h-400 a40 40 0 0 1 -40 -40 v-544 a40 40 0 0 1 40 -40z" fill="#ffffff"/>
+  <path d="M600 220 v100 a40 40 0 0 0 40 40 h100z" fill="#c9d8fb"/>
+  <!-- rendered lines -->
+  <rect x="330" y="420" width="250" height="34" rx="17" fill="#1f4fbf"/>
+  <rect x="330" y="490" width="360" height="22" rx="11" fill="#9db6ee"/>
+  <rect x="330" y="540" width="320" height="22" rx="11" fill="#9db6ee"/>
+  <rect x="330" y="590" width="340" height="22" rx="11" fill="#9db6ee"/>
+  <!-- raw markup hint -->
+  <text x="330" y="720" font-family="Menlo, monospace" font-size="72" font-weight="700" fill="#2f6feb">&lt;/&gt;</text>
+</svg>

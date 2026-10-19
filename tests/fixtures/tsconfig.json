@@ -1,0 +1,7 @@
+{
+  // Comments are allowed here (JSONC)
+  "compilerOptions": {
+    "strict": true, /* block comment */
+    "target": "ES2022",
+  },
+}
