@@ -88,22 +88,29 @@ never `innerHTML` raw file content; no `eval`; keep `script-src 'self'`; links a
 
 ## Roadmap (rough priority)
 
+Product questions and suggested defaults (audience, first run, signing, privacy, fidelity, export...)
+are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger features.
+
 1. **Verify on macOS + Windows** (above) and ship v0.1.0 via the release workflow.
 2. **Export**: "Export as HTML" (rendered content + inlined CSS), "Print / Save as PDF" (check
    `window.print()` support in each webview), optional DOCX via `pandoc` when it's installed. This was part
    of the original idea (HTML/DOCX/PDF renderers for Markdown).
-3. Native menu bar (File: Open, Open Recent, Export; View: Toggle Raw, Zoom; Window) with the same shortcuts.
-4. Remember window size/position (`tauri-plugin-window-state`) and recent files.
-5. Math in Markdown (KaTeX, lazy-loaded like Mermaid).
-6. Side-by-side diff mode; syntax highlighting inside diffs.
-7. Virtualized rendering for huge CSV/log files (currently: CSV pages 1000 rows, logs render all lines
+3. **Text encoding**: detect UTF-16 (BOM) and legacy encodings (`encoding_rs` + `chardetng`) in
+   `read_file_data`; Excel CSVs on Windows are often UTF-16/Windows-1252 and currently show garbled.
+4. **macOS native tabs**: `.tabbing_identifier("unfold")` on the window builder (macOS only) so
+   Window → Merge All Windows works. In-app tabs (setting) maybe later; see docs/PRODUCT.md §10.
+5. Native menu bar (File: Open, Open Recent, Export; View: Toggle Raw, Zoom; Window) with the same shortcuts.
+6. Remember window size/position (`tauri-plugin-window-state`) and recent files.
+7. Math in Markdown (KaTeX, lazy-loaded like Mermaid).
+8. Side-by-side diff mode; syntax highlighting inside diffs.
+9. Virtualized rendering for huge CSV/log files (currently: CSV pages 1000 rows, logs render all lines
    in `content-visibility` chunks; fine to ~100k lines).
-8. More types: YAML/TOML as trees, images, SQLite (read-only table browser), `.env` with value masking.
-9. macOS Quick Look extension (spacebar preview). Needs a separate Swift app extension target; Tauri can't
+10. More types: YAML/TOML as trees, images, SQLite (read-only table browser), `.env` with value masking.
+11. macOS Quick Look extension (spacebar preview). Needs a separate Swift app extension target; Tauri can't
    produce it directly. Could reuse the built `dist/` in a WKWebView.
-10. Distribution: code signing (Apple Developer ID + notarization, Windows cert), Homebrew cask, winget,
+12. Distribution: code signing (Apple Developer ID + notarization, Windows cert), Homebrew cask, winget,
     AUR, auto-update (`tauri-plugin-updater`).
-11. Optional web demo: the frontend already runs standalone in a browser (`npm run build`, host `dist/`).
+13. Optional web demo: the frontend already runs standalone in a browser (`npm run build`, host `dist/`).
 
 ## Known limitations / notes
 

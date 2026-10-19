@@ -2,6 +2,7 @@
 
 Cross-platform read-only viewer for Markdown and other dev files (Tauri 2 + TypeScript, no UI framework).
 **Read HANDOFF.md first**: status, what's unverified, architecture, roadmap.
+Product decisions and open questions: docs/PRODUCT.md.
 
 ## Commands
 
