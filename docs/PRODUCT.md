@@ -216,3 +216,6 @@ content on/off, default apps. That's it.
 | Date | Decision | Why |
 |---|---|---|
 | 2026-10-19 | One window per file by default; native macOS tabs; in-app tabs maybe later | Matches "open like a PDF"; tabs are cheap on macOS |
+| 2026-10-20 | **Developers first** for 1.0 | Owner's call; don't block non-developers later |
+| 2026-10-20 | **Folder mode deferred** to a later iteration, after more product thinking. Ship a cheap stopgap first: next/previous file in the same folder | Browsing several .md files without piling up windows is useful, but a sidebar is the first step toward a notes app |
+| 2026-10-20 | **Will pay for the Apple Developer Program** ($99/year, recurring) for signing + notarization | Signing is required for anyone beyond tolerant developers; Homebrew is also moving away from unsigned apps |

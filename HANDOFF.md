@@ -99,18 +99,22 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
    `read_file_data`; Excel CSVs on Windows are often UTF-16/Windows-1252 and currently show garbled.
 4. **macOS native tabs**: `.tabbing_identifier("unfold")` on the window builder (macOS only) so
    Window → Merge All Windows works. In-app tabs (setting) maybe later; see docs/PRODUCT.md §10.
-5. Native menu bar (File: Open, Open Recent, Export; View: Toggle Raw, Zoom; Window) with the same shortcuts.
-6. Remember window size/position (`tauri-plugin-window-state`) and recent files.
-7. Math in Markdown (KaTeX, lazy-loaded like Mermaid).
-8. Side-by-side diff mode; syntax highlighting inside diffs.
-9. Virtualized rendering for huge CSV/log files (currently: CSV pages 1000 rows, logs render all lines
+5. **Next / previous file in the same folder** (e.g. Cmd/Ctrl+Alt+→/←, plus small arrows in the top bar):
+   a Rust command lists sibling files of supported types (sorted, ignoring hidden files); the frontend
+   steps through them in the current window. Cheap stopgap for browsing docs folders; full folder mode
+   with a sidebar is deferred (docs/PRODUCT.md decision log).
+6. Native menu bar (File: Open, Open Recent, Export; View: Toggle Raw, Zoom; Window) with the same shortcuts.
+7. Remember window size/position (`tauri-plugin-window-state`) and recent files.
+8. Math in Markdown (KaTeX, lazy-loaded like Mermaid).
+9. Side-by-side diff mode; syntax highlighting inside diffs.
+10. Virtualized rendering for huge CSV/log files (currently: CSV pages 1000 rows, logs render all lines
    in `content-visibility` chunks; fine to ~100k lines).
-10. More types: YAML/TOML as trees, images, SQLite (read-only table browser), `.env` with value masking.
-11. macOS Quick Look extension (spacebar preview). Needs a separate Swift app extension target; Tauri can't
+11. More types: YAML/TOML as trees, images, SQLite (read-only table browser), `.env` with value masking.
+12. macOS Quick Look extension (spacebar preview). Needs a separate Swift app extension target; Tauri can't
    produce it directly. Could reuse the built `dist/` in a WKWebView.
-12. Distribution: code signing (Apple Developer ID + notarization, Windows cert), Homebrew cask, winget,
+13. Distribution: code signing (Apple Developer ID + notarization, Windows cert), Homebrew cask, winget,
     AUR, auto-update (`tauri-plugin-updater`).
-13. Optional web demo: the frontend already runs standalone in a browser (`npm run build`, host `dist/`).
+14. Optional web demo: the frontend already runs standalone in a browser (`npm run build`, host `dist/`).
 
 ## Known limitations / notes
 
