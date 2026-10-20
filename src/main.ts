@@ -16,7 +16,7 @@ const MOD = isMac ? "⌘" : "Ctrl+";
 
 const app = document.getElementById("app")!;
 const backBtn = el("button", { class: "icon-btn", id: "back", title: "Back (Alt+←)", "aria-label": "Back", hidden: "" }, "←");
-const nameEl = el("span", { class: "file-name" }, "Unfold");
+const nameEl = el("span", { class: "file-name" }, "Plica");
 const metaEl = el("span", { class: "file-meta" });
 const previewBtn = el("button", { "data-mode": "rendered", role: "tab" }, "Preview");
 const rawBtn = el("button", { "data-mode": "raw", role: "tab" }, "Raw");
@@ -64,7 +64,7 @@ function emptyState(): HTMLElement {
     "div",
     { class: "empty" },
     el("div", { class: "empty-mark", "aria-hidden": "true" }, "❯_"),
-    el("h1", {}, "Unfold"),
+    el("h1", {}, "Plica"),
     el("p", {}, "Drop a file here, or"),
     openLink,
     el("p", { class: "muted small" }, types, " · and any text or code file"),
@@ -98,7 +98,7 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
   if (doc.truncated) content.append(el("div", { class: "notice" }, "This file is very large; only the first part is shown."));
 
   if (doc.binary) {
-    content.append(el("div", { class: "notice" }, el("strong", {}, "This looks like a binary file."), el("div", {}, "Unfold shows text files only.")));
+    content.append(el("div", { class: "notice" }, el("strong", {}, "This looks like a binary file."), el("div", {}, "Plica shows text files only.")));
   } else if (effective === "raw") {
     content.append(renderRaw(doc.text, rawLanguageFor(doc, renderer), { wrap: renderer.id === "markdown" || renderer.id === "code" && /\.(txt|text)$/i.test(doc.name) }));
   } else {

@@ -1,5 +1,5 @@
 {
-  "name": "unfold",
+  "name": "plica",
   "private": true,
   "version": "0.1.0",
   "description": "A tiny, fast viewer for Markdown, JSON, CSV, notebooks, logs, diffs and other dev files, with a one-key raw/rendered toggle.",

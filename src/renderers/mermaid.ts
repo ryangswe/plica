@@ -22,7 +22,7 @@ async function renderDiagram(source: string, dark: boolean): Promise<HTMLElement
   const box = el("div", { class: "mermaid-diagram" });
   try {
     const mermaid = await getMermaid(dark);
-    const { svg } = await mermaid.render(`unfold-mermaid-${++counter}`, source);
+    const { svg } = await mermaid.render(`plica-mermaid-${++counter}`, source);
     box.innerHTML = svg;
   } catch (err) {
     box.classList.add("render-error");
@@ -32,7 +32,7 @@ async function renderDiagram(source: string, dark: boolean): Promise<HTMLElement
       el("pre", {}, source),
     );
     // Mermaid sometimes leaves an orphaned error element in <body>.
-    document.getElementById(`dunfold-mermaid-${counter}`)?.remove();
+    document.getElementById(`dplica-mermaid-${counter}`)?.remove();
   }
   return box;
 }

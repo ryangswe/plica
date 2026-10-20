@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # "Run workflow" in the Actions tab also checks the desktop shell on macOS and Windows.
+  workflow_dispatch:
 
 jobs:
   web:
@@ -32,7 +34,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest, windows-latest]
+        # macOS/Windows runners cost 10x/2x minutes on private repos, so pushes only check Linux.
+        # Run the workflow manually (or switch this back once the repo is public) for all three.
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJSON('["ubuntu-22.04","macos-latest","windows-latest"]') || fromJSON('["ubuntu-22.04"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

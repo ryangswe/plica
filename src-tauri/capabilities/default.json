@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for every Unfold window",
+  "description": "Permissions for every Plica window",
   "windows": ["w*"],
   "permissions": [
     "core:default",

@@ -1,4 +1,4 @@
-//! Desktop shell for Unfold.
+//! Desktop shell for Plica.
 //!
 //! Responsibilities (everything else lives in the web frontend):
 //! - figure out which file(s) the OS asked us to open (CLI args, macOS "open" events,
@@ -148,7 +148,7 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<()> {
         },
     );
     let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
-        .title("Unfold")
+        .title("Plica")
         .inner_size(1000.0, 780.0)
         .min_inner_size(420.0, 320.0)
         .zoom_hotkeys_enabled(true); // Ctrl/Cmd + / - / 0 to zoom
@@ -263,7 +263,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Unfold");
+        .expect("error while building Plica");
 
     app.run(|_app, _event| {
         // macOS delivers Finder "Open" / double-click as an event, not as arguments.
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn reads_text_and_strips_bom() {
-        let dir = std::env::temp_dir().join(format!("unfold-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("plica-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let p = dir.join("a.md");
         File::create(&p).unwrap().write_all("\u{feff}# hi".as_bytes()).unwrap();
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn detects_binary() {
-        let dir = std::env::temp_dir().join(format!("unfold-test-bin-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("plica-test-bin-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let p = dir.join("b.bin");
         File::create(&p).unwrap().write_all(&[1, 2, 0, 3]).unwrap();
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn args_skip_flags_and_missing_files() {
-        let dir = std::env::temp_dir().join(format!("unfold-test-args-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("plica-test-args-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         File::create(dir.join("x.md")).unwrap();
         let got = paths_from_args(vec!["--flag".into(), "x.md".into(), "nope.md".into()], &dir);

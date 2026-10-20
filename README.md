@@ -1,8 +1,8 @@
-# Unfold
+# Plica
 
 **Double-click a Markdown file and actually read it.**
 
-Unfold is a tiny, free, open-source viewer for the text files developers deal with every day. It opens
+Plica is a tiny, free, open-source viewer for the text files developers deal with every day. It opens
 Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, instantly, without an IDE. Press
 <kbd>Cmd</kbd>/<kbd>Ctrl</kbd> + <kbd>/</kbd> to flip to the raw source and back, like GitHub's Preview / Code tabs.
 
@@ -53,17 +53,17 @@ Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, insta
 Download the installer for your OS from the [Releases](../../releases) page.
 
 > **The app isn't code-signed yet**, so the first launch shows a warning:
-> - **macOS:** right-click Unfold.app → **Open** → **Open**. If macOS says the app is "damaged", run
->   `xattr -cr /Applications/Unfold.app` once.
+> - **macOS:** right-click Plica.app → **Open** → **Open**. If macOS says the app is "damaged", run
+>   `xattr -cr /Applications/Plica.app` once.
 > - **Windows:** SmartScreen → **More info** → **Run anyway**.
 
 ### Make it the default for Markdown
 
-- **macOS:** right-click any `.md` file → **Get Info** → **Open with:** Unfold → **Change All…**
-- **Windows:** right-click a `.md` file → **Open with** → **Choose another app** → Unfold → tick **Always**.
-- **Linux:** `xdg-mime default unfold.desktop text/markdown` (or use your file manager's "Open With").
+- **macOS:** right-click any `.md` file → **Get Info** → **Open with:** Plica → **Change All…**
+- **Windows:** right-click a `.md` file → **Open with** → **Choose another app** → Plica → tick **Always**.
+- **Linux:** `xdg-mime default Plica.desktop text/markdown` (or use your file manager's "Open With").
 
-Unfold registers itself for Markdown, JSON, CSV/TSV, notebooks, logs, diffs and Mermaid files, so it shows
+Plica registers itself for Markdown, JSON, CSV/TSV, notebooks, logs, diffs and Mermaid files, so it shows
 up in "Open With" for all of them.
 
 ## Development

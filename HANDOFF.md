@@ -24,10 +24,11 @@ Working and tested on Linux (in a headless X server):
 - Linux packaging: `npm run tauri build` produces .deb / .rpm (~3.3 MB) and .AppImage (~78 MB, it bundles
   WebKitGTK). The installed .deb was tested end to end: opening a file through its desktop entry (what a
   file manager does on double-click) shows the file rendered. A custom desktop template
-  (`src-tauri/linux/unfold.desktop`) adds the `%F` the default template was missing.
+  (`src-tauri/linux/plica.desktop`) adds the `%F` the default template was missing.
 - Tests: 23 unit tests (vitest + jsdom), 15 browser e2e tests (Playwright against `vite preview`, which
   sends the same CSP as the app, and the tests fail on any CSP violation), 3 Rust unit tests.
-- CI (`.github/workflows/ci.yml`): typecheck, unit, e2e, clippy + cargo test on Linux/macOS/Windows.
+- CI (`.github/workflows/ci.yml`): typecheck, unit, e2e, clippy + cargo test. Pushes check Linux only (private-repo
+  minutes: macOS runners bill 10x); "Run workflow" manually checks macOS + Windows too.
 - Release (`.github/workflows/release.yml`): push a `v*` tag → draft GitHub Release with .dmg (Apple Silicon
   and Intel), .msi/.exe, .deb/.rpm/.AppImage. "Run workflow" builds the same as downloadable artifacts.
 
@@ -39,13 +40,13 @@ per the Tauri docs but untested.
 1. `npm install && npm test && npm run test:e2e` — should all pass.
 2. `npm run tauri dev` — app opens with the empty state; drag a file in; try every fixture in `tests/fixtures/`.
 3. `npm run tauri build`, then install/open the built app and check:
-   - **macOS double-click flow**: set Unfold as the default for `.md` (Get Info → Open with → Change All),
-     quit Unfold, double-click a `.md` in Finder. Expected: exactly one window showing that file (macOS
+   - **macOS double-click flow**: set Plica as the default for `.md` (Get Info → Open with → Change All),
+     quit Plica, double-click a `.md` in Finder. Expected: exactly one window showing that file (macOS
      sends the file via `RunEvent::Opened` *after* launch; `open_paths` in `src-tauri/src/lib.rs` reuses
      the initial empty window). Double-click a second file while running → second window.
    - Is there a sensible macOS menu bar (Edit → Copy needs to work; Cmd+Q, Cmd+W)? Tauri 2 should add a
      default menu on macOS; if not, add one (see roadmap).
-   - Unfold appears in Finder's "Open With" for .md/.json/.csv/.ipynb/.log/.diff/.mmd.
+   - Plica appears in Finder's "Open With" for .md/.json/.csv/.ipynb/.log/.diff/.mmd.
    - Live reload when saving from VS Code / vim (they save via rename; we watch the parent folder).
    - Windows: double-click flow, "Open with" registration from the MSI/NSIS installer, paths with
      backslashes and spaces, relative images.
@@ -97,7 +98,7 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
    of the original idea (HTML/DOCX/PDF renderers for Markdown).
 3. **Text encoding**: detect UTF-16 (BOM) and legacy encodings (`encoding_rs` + `chardetng`) in
    `read_file_data`; Excel CSVs on Windows are often UTF-16/Windows-1252 and currently show garbled.
-4. **macOS native tabs**: `.tabbing_identifier("unfold")` on the window builder (macOS only) so
+4. **macOS native tabs**: `.tabbing_identifier("plica")` on the window builder (macOS only) so
    Window → Merge All Windows works. In-app tabs (setting) maybe later; see docs/PRODUCT.md §10.
 5. **Next / previous file in the same folder** (e.g. Cmd/Ctrl+Alt+→/←, plus small arrows in the top bar):
    a Rust command lists sibling files of supported types (sorted, ignoring hidden files); the frontend
@@ -119,8 +120,10 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
 ## Known limitations / notes
 
 - App is unsigned → Gatekeeper / SmartScreen warnings (documented in README).
-- Name "Unfold" and identifier `io.github.unfold-viewer` are placeholders; check for conflicts before
-  publishing (rename = find/replace "Unfold"/"unfold" + `identifier` in tauri.conf.json).
+- Name: **Plica** (Latin for "a fold"). Domain **plica.dev** (owner's Cloudflare account). Repo: private
+  `ryangswe/plica` during development; later open source or a paid product (undecided, see docs/PRODUCT.md).
+  Bundle identifier: `dev.plica.viewer`. **Don't change it after the first public release**: macOS/Windows
+  tie file associations and saved settings to it.
 - The Raw view of Markdown with front matter: highlight.js treats the closing `---` as a setext heading,
   so the YAML is colored oddly. Cosmetic.
 - Linux: the single-instance plugin uses D-Bus; without a session bus each launch is a separate process.

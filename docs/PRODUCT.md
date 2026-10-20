@@ -1,6 +1,6 @@
 # Product notes
 
-Thinking about turning Unfold from a working prototype into something people trust and keep installed,
+Thinking about turning Plica from a working prototype into something people trust and keep installed,
 for developers and for non-technical people who just received a `.md` or `.csv` file.
 
 Nothing here is decided. Each section lists the questions, what's at stake, and a **suggested default**.
@@ -38,8 +38,8 @@ Implications:
   tooltips for non-technical readers.
 - **Non-technical people need the app to explain itself:** a short line like "This is a Markdown file, a
   plain-text format for formatted documents" on first open of each type, dismissible.
-- **Developers need a CLI:** `unfold README.md`, `unfold .` (see folder mode), and **piping**:
-  `git diff | unfold`, `curl … | unfold --json`, `cat app.log | unfold --log`. Piped input is a strong
+- **Developers need a CLI:** `plica README.md`, `plica .` (see folder mode), and **piping**:
+  `git diff | plica`, `curl … | plica --json`, `cat app.log | plica --log`. Piped input is a strong
   developer feature and cheap to add (read stdin, pick a type from a flag or by sniffing the content).
 
 ## 3. First run and becoming the default app
@@ -48,9 +48,9 @@ This is the single biggest friction point. The app is useless until it's the def
 
 - **The OSes don't let apps silently make themselves the default:** Windows 10/11 forbids it, and macOS
   makes it awkward. We need a guided flow.
-- **Suggested:** a first-run screen, "Open these with Unfold": ☑ Markdown ☐ JSON ☐ CSV ☐ Notebooks
+- **Suggested:** a first-run screen, "Open these with Plica": ☑ Markdown ☐ JSON ☐ CSV ☐ Notebooks
   ☐ Logs ☐ Diffs, with per-OS steps or deep links (Windows: open the "Default apps" settings page for
-  Unfold; macOS: try `LSSetDefaultRoleHandlerForContentType`, falling back to the Get Info steps).
+  Plica; macOS: try `LSSetDefaultRoleHandlerForContentType`, falling back to the Get Info steps).
 - **Don't grab CSV or JSON by default.** Non-technical users often want CSV in Excel/Numbers.
   Markdown only should be pre-checked.
 - Settings should show and re-run this ("Default apps…").
@@ -150,7 +150,7 @@ Developers will compare against GitHub's rendering and file bugs on every differ
 ## 10. Windows vs tabs (from our discussion)
 
 - **Default: one window per file**, like Preview or a PDF viewer. This already works.
-- **macOS native tabs:** add `.tabbing_identifier("unfold")` to the window builder in `create_window`
+- **macOS native tabs:** add `.tabbing_identifier("plica")` to the window builder in `create_window`
   (macOS only), so Window → Merge All Windows and the "Prefer tabs" system setting work. Test on a Mac.
 - **Later, optional:** in-app tabs as a setting ("Open files in: New window / Tab in current window").
   This is the only way to get tabs on Windows/Linux, and it saves memory when many files are open.
@@ -184,10 +184,10 @@ content on/off, default apps. That's it.
 
 ## 14. Name, identity, website
 
-- **"Unfold" is a placeholder.** Before 1.0: check GitHub, the app stores, Homebrew/winget package names,
-  trademarks, and a domain. Changing the name later is cheap; **the bundle identifier is not**:
-  macOS/Windows key file associations and stored settings to it. Pick the final identifier
-  before the first public release.
+- **Name decided: Plica** (Latin for "a fold"; the raw text folds into the rendered view). Domain:
+  **plica.dev**. Bundle identifier: `dev.plica.viewer`; keep it fixed from the first public release on,
+  since macOS/Windows tie file associations and stored settings to it. Still to check before launch:
+  trademarks, and Homebrew/winget package-name availability.
 - A one-page website (GitHub Pages) with download buttons that detect the visitor's OS, and the web demo
   (the frontend already runs in a browser) so people can try it before installing.
 
@@ -204,7 +204,7 @@ content on/off, default apps. That's it.
 1. Primary audience for 1.0: developers first (CLI, piping, fidelity) or everyone (first-run guide,
    signing, plain-language UI)? Suggested: developers first, but don't make choices that block
    non-developers later. Signing is the gate for the second group.
-2. Folder mode (`unfold docs/` with a file sidebar for browsing a docs folder): very useful for
+2. Folder mode (`plica docs/` with a file sidebar for browsing a docs folder): very useful for
    developers, but it's the first step toward being a notes app. In or out for 1.0?
 3. Willing to pay ~$100–200/year for code signing?
 4. Final name?
@@ -218,4 +218,5 @@ content on/off, default apps. That's it.
 | 2026-10-19 | One window per file by default; native macOS tabs; in-app tabs maybe later | Matches "open like a PDF"; tabs are cheap on macOS |
 | 2026-10-20 | **Developers first** for 1.0 | Owner's call; don't block non-developers later |
 | 2026-10-20 | **Folder mode deferred** to a later iteration, after more product thinking. Ship a cheap stopgap first: next/previous file in the same folder | Browsing several .md files without piling up windows is useful, but a sidebar is the first step toward a notes app |
+| 2026-10-20 | **Name: Plica**, domain plica.dev, private repo ryangswe/plica during development | Recto/Gander/Sheaf were taken by similar apps; Plica had no software clashes |
 | 2026-10-20 | **Will pay for the Apple Developer Program** ($99/year, recurring) for signing + notarization | Signing is required for anyone beyond tolerant developers; Homebrew is also moving away from unsigned apps |

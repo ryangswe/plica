@@ -3,7 +3,7 @@ title: Sample document
 tags: [demo, markdown]
 ---
 
-# Unfold sample
+# Plica sample
 
 A quick tour of what the **Markdown** preview supports. Press `Cmd/Ctrl + /` to flip to the raw source.
 
@@ -55,14 +55,14 @@ export function double(n: number) { return n * 2; }
 
 ```mermaid
 flowchart LR
-  A[Double-click .md] --> B{Unfold}
+  A[Double-click .md] --> B{Plica}
   B -->|Preview| C[Rendered]
   B -->|Cmd+/| D[Raw]
 ```
 
 ## Image
 
-<img src="icon.svg" alt="Unfold icon" width="96">
+<img src="icon.svg" alt="Plica icon" width="96">
 
 <details>
 <summary>Collapsible HTML section</summary>

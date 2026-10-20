@@ -23,7 +23,7 @@ test.afterEach(() => {
 });
 
 test("empty state", async ({ page }) => {
-  await expect(page.getByRole("heading", { name: "Unfold" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plica" })).toBeVisible();
   await expect(page.locator(".mode-switch")).toBeHidden();
   await page.screenshot({ path: `${SHOTS}/00-empty.png` });
 });
@@ -31,7 +31,7 @@ test("empty state", async ({ page }) => {
 test("markdown: preview, toggle to raw with button and keyboard", async ({ page }) => {
   await open(page, "sample.md");
   const body = page.locator(".markdown-body");
-  await expect(body.locator("h1")).toContainText("Unfold sample");
+  await expect(body.locator("h1")).toContainText("Plica sample");
   await expect(body.locator("table")).toBeVisible();
   await expect(body.locator(".alert-note")).toBeVisible();
   await expect(body.locator(".mermaid-diagram svg")).toBeVisible({ timeout: 15000 });

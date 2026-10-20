@@ -1,5 +1,5 @@
 [package]
-name = "unfold"
+name = "plica"
 version = "0.1.0"
 description = "A tiny, fast viewer for Markdown and other dev files"
 license = "MIT"
@@ -7,7 +7,7 @@ edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "unfold_lib"
+name = "plica_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
