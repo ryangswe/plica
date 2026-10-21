@@ -22,7 +22,7 @@ const metaEl = el("span", { class: "file-meta" });
 const previewBtn = el("button", { "data-mode": "rendered", role: "tab" }, "Preview");
 const rawBtn = el("button", { "data-mode": "raw", role: "tab" }, "Raw");
 const modeSwitch = el("div", { class: "mode-switch", role: "tablist", title: `Toggle Preview / Raw (${MOD}/)`, hidden: "" }, previewBtn, rawBtn);
-const copyBtn = el("button", { class: "ghost", title: "Copy the file's text", hidden: "" }, "Copy");
+const copyBtn = el("button", { class: "ghost", title: "Copy the whole file as plain text", hidden: "" }, "Copy source");
 const openBtn = el("button", { class: "ghost", title: `Open a file (${MOD}O)` }, "Open…");
 const bar = el(
   "header",
@@ -232,15 +232,27 @@ previewBtn.addEventListener("click", () => setMode("rendered"));
 rawBtn.addEventListener("click", () => setMode("raw"));
 openBtn.addEventListener("click", () => void pick());
 backBtn.addEventListener("click", goBack);
-copyBtn.addEventListener("click", async () => {
-  if (!doc) return;
+async function copyText(text: string, done: string) {
   try {
-    await navigator.clipboard.writeText(doc.text);
-    showToast("Copied to clipboard");
+    await navigator.clipboard.writeText(text);
+    showToast(done);
   } catch {
     showToast("Couldn't access the clipboard");
   }
-});
+}
+copyBtn.addEventListener("click", () => doc && void copyText(doc.text, "Copied source"));
+
+/** Commands from the native menu bar (macOS). */
+function runCommand(id: string) {
+  if (id === "toggle-raw") setMode(mode === "raw" ? "rendered" : "raw");
+  else if (id === "reload" && doc?.path) void openPath(doc.path, { pushHistory: false });
+  else if (id === "back") goBack();
+  else if (id === "copy-source" && doc && !doc.binary) void copyText(doc.text, "Copied source");
+  else if (id === "copy-path" && doc?.path) void copyText(doc.path, "Copied path");
+  else if (id === "find" && doc) find.show();
+  else if (id === "find-next" && doc) find.next();
+  else if (id === "find-prev" && doc) find.prev();
+}
 darkQuery.addEventListener("change", () => void render({ keepScroll: true }));
 
 // Links inside rendered content must never navigate the app window itself.
@@ -272,7 +284,12 @@ view.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   const mod = isMac ? e.metaKey : e.ctrlKey;
   const key = e.key.toLowerCase();
-  if (mod && (key === "/" || e.code === "Slash")) {
+  // With a native menu bar, its items own these shortcuts: leave the keys alone so the menu gets them.
+  if (host?.nativeMenu && mod && (["/", "o", "f", "g", "r", "["].includes(key) || e.code === "Slash")) return;
+  if (mod && key === "g") {
+    e.preventDefault();
+    if (doc) (e.shiftKey ? find.prev : find.next)();
+  } else if (mod && (key === "/" || e.code === "Slash")) {
     e.preventDefault();
     setMode(mode === "raw" ? "rendered" : "raw");
   } else if (mod && key === "o") {
@@ -313,6 +330,7 @@ async function boot() {
     openPath: (p) => void openPath(p),
     error: (m) => showToast(m, 3500),
     dragging: (on) => (dropOverlay.hidden = !on),
+    command: runCommand,
   });
 }
 

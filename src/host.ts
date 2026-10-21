@@ -9,7 +9,16 @@ import type { FileDoc } from "./types";
 export interface Host {
   kind: "tauri" | "browser";
   /** Wire up OS integration (initial file, Finder/Explorer "open", drag & drop). */
-  init(handlers: { open(doc: FileDoc): void; openPath(path: string): void; error(msg: string): void; dragging(on: boolean): void }): Promise<void>;
+  init(handlers: {
+    open(doc: FileDoc): void;
+    openPath(path: string): void;
+    error(msg: string): void;
+    dragging(on: boolean): void;
+    /** A native menu command (macOS menu bar), e.g. "toggle-raw", "find", "copy-path". */
+    command(id: string): void;
+  }): Promise<void>;
+  /** True when a native menu bar owns the standard shortcuts (Cmd+O, Cmd+F, Cmd+/...). */
+  nativeMenu: boolean;
   pickFile(): Promise<FileDoc | null>;
   canReadPaths: boolean;
   readPath(path: string): Promise<FileDoc>;
@@ -59,6 +68,7 @@ export function createBrowserHost(): Host {
   return {
     kind: "browser",
     canReadPaths: false,
+    nativeMenu: false,
     async init({ open, dragging }) {
       input.addEventListener("change", async () => {
         const f = input.files?.[0];
@@ -117,8 +127,10 @@ export async function createTauriHost(): Promise<Host> {
   return {
     kind: "tauri",
     canReadPaths: true,
-    async init({ openPath, error, dragging }) {
+    nativeMenu: /Mac/.test(navigator.platform),
+    async init({ openPath, error, dragging, command }) {
       await win.listen<string>("open-path", (e) => openPath(e.payload));
+      await win.listen<string>("menu", (e) => command(e.payload));
       await win.listen<string>("file-changed", () => changeHandler?.());
       await win.onDragDropEvent((e) => {
         const p = e.payload;

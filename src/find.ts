@@ -203,6 +203,9 @@ export function createFindBar(getRoot: () => HTMLElement | null, getSource: () =
     show,
     hide,
     isOpen: () => !bar.hidden,
+    /** Find Next / Previous (Cmd+G / Shift+Cmd+G): opens the bar first if it's closed. */
+    next: () => (bar.hidden ? show() : go(1)),
+    prev: () => (bar.hidden ? show() : go(-1)),
     /** Call after the view re-renders. */
     refresh: () => {
       marks = [];

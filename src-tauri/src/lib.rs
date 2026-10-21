@@ -18,6 +18,8 @@ use std::{
 };
 
 mod encoding;
+#[cfg(target_os = "macos")]
+mod menu;
 
 use encoding::decode_text;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -127,6 +129,12 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
     let entry = windows.entry(window.label().to_string()).or_default();
     entry.current = Some(target);
     entry.watcher = Some(watcher); // drops (stops) the previous watcher
+    drop(windows);
+    #[cfg(target_os = "macos")]
+    {
+        let recent = PathBuf::from(&path);
+        let _ = window.run_on_main_thread(move || menu::note_recent(&recent));
+    }
     Ok(())
 }
 
@@ -169,9 +177,16 @@ fn concerns_file(event: &notify::Event, file_name: &std::ffi::OsStr) -> bool {
         && event.paths.iter().any(|p| p.file_name() == Some(file_name))
 }
 
+/// Cmd/Ctrl-click on a link: open the file in its own window (or focus the one already showing it).
 #[tauri::command]
-fn open_window(app: AppHandle, path: String) -> Result<(), String> {
-    create_window(&app, Some(PathBuf::from(path))).map_err(|e| e.to_string())
+fn open_window(app: AppHandle, path: String) {
+    open_paths(&app, vec![PathBuf::from(path)]);
+}
+
+/// The file a window currently shows.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn current_file(app: &AppHandle, label: &str) -> Option<PathBuf> {
+    app.state::<AppState>().windows.lock().unwrap().get(label)?.current.clone()
 }
 
 fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<()> {
@@ -297,7 +312,11 @@ fn paths_from_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<Pa
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    menu::register_shortcuts();
     let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(menu::build).on_menu_event(menu::handle);
 
     // On Windows/Linux, double-clicking a second file starts a second process;
     // forward its arguments to the running app instead. (macOS keeps one process
@@ -338,6 +357,7 @@ pub fn run() {
     app.run(|_app, _event| {
         #[cfg(target_os = "macos")]
         match _event {
+            tauri::RunEvent::Ready => menu::after_launch(),
             // Finder "Open" / double-click arrives as an event, not as arguments.
             tauri::RunEvent::Opened { urls } => {
                 let paths = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();

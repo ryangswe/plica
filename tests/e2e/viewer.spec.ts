@@ -38,6 +38,7 @@ test("markdown: preview, toggle to raw with button and keyboard", async ({ page 
   await expect(body.locator(".alert-note")).toBeVisible();
   await expect(body.locator(".mermaid-diagram svg")).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".toc")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy source" })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/01-markdown.png` });
 
   await page.getByRole("tab", { name: "Raw" }).click();
@@ -201,6 +202,14 @@ test("find highlights matches and opens collapsed sections", async ({ page }) =>
   await expect(page.locator("mark.find-hit")).toHaveCount(1);
   await expect(page.locator("mark.find-hit.current")).toBeVisible();
   await expect(page.locator(".find-count")).toHaveText("1 / 1");
+  // Find Next / Previous with Cmd/Ctrl+G and Shift+Cmd/Ctrl+G (the macOS menu owns these in the app).
+  await page.getByPlaceholder("Find…").fill("the");
+  await expect(page.locator(".find-count")).toHaveText(/^1 \/ ([2-9]|\d\d+)$/); // several matches, first selected
+  const first = await page.locator(".find-count").textContent();
+  await page.keyboard.press(`${mod}+KeyG`);
+  await expect(page.locator(".find-count")).not.toHaveText(first!);
+  await page.keyboard.press(`${mod}+Shift+KeyG`);
+  await expect(page.locator(".find-count")).toHaveText(first!);
   await page.keyboard.press("Escape");
   await expect(page.locator("mark.find-hit")).toHaveCount(0);
 });

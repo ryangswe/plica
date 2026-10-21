@@ -19,6 +19,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 notify = "8"
+serde_json = "1"
 # Text encodings (Firefox's decoder and detector): UTF-16, Windows-1252, Shift_JIS... ~215 KB.
 encoding_rs = "0.8"
 chardetng = "0.1"
@@ -26,10 +27,11 @@ chardetng = "0.1"
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"
 
-# Already built as part of Tauri on macOS; used directly for native tab selection (Cmd+1…9).
+# Already built as part of Tauri on macOS; used directly for native tabs, the menu bar and Open Recent.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSWindow", "NSWindowTabGroup"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSDocumentController", "NSMenu", "NSMenuItem", "NSResponder", "NSWindow", "NSWindowTabGroup", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSDictionary", "NSString", "NSURL", "NSUserDefaults"] }
 
 [profile.release]
 codegen-units = 1

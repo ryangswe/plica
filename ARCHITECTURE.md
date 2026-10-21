@@ -18,6 +18,8 @@ src/                     web frontend (TypeScript, no framework, Vite)
 src-tauri/
   src/lib.rs             windows, file reading, watching, OS open events, macOS tabs
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
+  src/menu.rs            macOS menu bar, Open Recent (AppKit-managed), Open in Editor; commands the
+                         frontend owns are sent to the focused window as `menu` events
   tauri.conf.json        CSP, asset protocol, file associations, bundle settings
   capabilities/          permissions granted to windows (labels w0, w1, ...)
 tests/
