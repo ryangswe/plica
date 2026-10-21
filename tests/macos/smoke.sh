@@ -20,7 +20,12 @@ quit() {
   for _ in $(seq 20); do pgrep -xq plica || return 0; sleep 0.25; done
   echo "FAIL quit: Plica is still running"; fails=$((fails + 1)); pkill -x plica || true
 }
-open_file() { open -a "$APP" "$@"; sleep "${WAIT:-2.5}"; }
+# Right after a quit, LaunchServices can briefly refuse to relaunch (error -600/-609), so retry.
+launch() {
+  for _ in 1 2 3 4 5; do open -a "$APP" "$@" 2>/dev/null && return 0; sleep 1; done
+  echo "FAIL could not launch $APP $*"; exit 1
+}
+open_file() { launch "$@"; sleep "${WAIT:-2.5}"; }
 # All windows, or only the visible ones (background tabs are off screen).
 windows() { osascript -l JavaScript "$HERE/windows.js" | awk -F'\t' -v m="${1:-all}" 'm=="all" || $2=="on" {print $1}' | tr '\n' ' ' | sed 's/ $//'; }
 expect() { # description, expected, actual
@@ -33,11 +38,11 @@ quit
 open_file "$FIX/sample.md";              expect "cold start with a file: one window" "sample.md" "$(windows)"
 open_file "$FIX/data.csv";               expect "second file while running: new window" "data.csv sample.md" "$(windows)"
 open_file "$FIX/sample.md";              expect "reopening a file: no duplicate" "data.csv sample.md" "$(windows)"
-open -a "$APP"; sleep 1.5;               expect "Dock click with windows open: no new window" "data.csv sample.md" "$(windows)"
+launch; sleep 1.5;                       expect "Dock click with windows open: no new window" "data.csv sample.md" "$(windows)"
 quit
 open_file "$FIX/sample.md" "$FIX/app.log"; expect "cold start with two files" "app.log sample.md" "$(windows)"
 quit
-open -a "$APP"; sleep 2.5;               expect "plain launch: one empty window" "Plica" "$(windows)"
+launch; sleep 2.5;                       expect "plain launch: one empty window" "Plica" "$(windows)"
 open_file "$FIX/app.log";                expect "file goes into the empty window" "app.log" "$(windows)"
 quit
 

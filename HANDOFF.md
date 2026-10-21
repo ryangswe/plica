@@ -122,7 +122,8 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
 4. ~~**macOS native tabs**~~ **Done 2026-10-21**: `.tabbing_identifier("plica")` in `create_window`
    (macOS only). Tauri's default menu registers its Window menu with AppKit, so Show Tab Bar / Merge All
    Windows / Move Tab to New Window appear there; "Prefer tabs: Always" opens files as tabs, and reopening
-   a file selects its tab. Covered by `tests/macos/smoke.sh`. In-app tabs (setting) maybe later; see
+   a file selects its tab. Switch tabs with Ctrl+Tab (native) or Cmd+1…9 (`select_tab` command, 9 = last).
+   Covered by `tests/macos/smoke.sh` (except the keys: it can't press them). In-app tabs (setting) maybe later; see
    docs/PRODUCT.md §10.
 5. **Next / previous file in the same folder** (e.g. Cmd/Ctrl+Alt+→/←, plus small arrows in the top bar):
    a Rust command lists sibling files of supported types (sorted, ignoring hidden files); the frontend

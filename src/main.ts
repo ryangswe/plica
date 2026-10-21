@@ -252,6 +252,10 @@ document.addEventListener("keydown", (e) => {
   } else if ((e.altKey && e.key === "ArrowLeft") || (mod && e.key === "[")) {
     e.preventDefault();
     goBack();
+  } else if (isMac && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && /^Digit[1-9]$/.test(e.code)) {
+    // Cmd+1…9 jumps to a native tab. e.code, so it works on layouts where digits need Shift.
+    e.preventDefault();
+    host.selectTab(Number(e.code.slice(5)));
   } else if (e.key === "Escape" && find.isOpen()) {
     find.hide();
   }

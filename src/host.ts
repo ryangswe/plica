@@ -18,6 +18,8 @@ export interface Host {
   openExternal(url: string): void;
   setTitle(title: string): void;
   openInNewWindow(path: string): void;
+  /** Bring the n-th native tab (1–9, 9 = last) of this window forward. macOS desktop only. */
+  selectTab(n: number): void;
 }
 
 interface RawFile {
@@ -90,6 +92,7 @@ export function createBrowserHost(): Host {
       document.title = title;
     },
     openInNewWindow() {},
+    selectTab() {},
   };
 }
 
@@ -148,6 +151,9 @@ export async function createTauriHost(): Promise<Host> {
     },
     openInNewWindow(path) {
       invoke("open_window", { path }).catch(() => {});
+    },
+    selectTab(n) {
+      invoke("select_tab", { n }).catch(() => {});
     },
   };
 }

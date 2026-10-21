@@ -130,6 +130,38 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
     Ok(())
 }
 
+/// Which tab Cmd+`n` selects in a group of `count` tabs: 1–8 by position, 9 is the last one
+/// (same as Safari and Terminal).
+fn tab_index(n: usize, count: usize) -> Option<usize> {
+    match n {
+        9 if count > 0 => Some(count - 1),
+        1..=8 if n <= count => Some(n - 1),
+        _ => None,
+    }
+}
+
+/// Cmd+1…9: bring the n-th native tab of this window's tab group to the front (macOS only).
+#[tauri::command]
+fn select_tab(window: WebviewWindow, n: usize) {
+    #[cfg(target_os = "macos")]
+    {
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let Ok(ptr) = w.ns_window() else { return };
+            // SAFETY: Tauri hands out the live NSWindow of this webview window, and we are on the
+            // main thread as AppKit requires.
+            let ns_window = unsafe { &*(ptr as *const objc2_app_kit::NSWindow) };
+            let Some(group) = ns_window.tabGroup() else { return };
+            let tabs = group.windows();
+            if let Some(i) = tab_index(n, tabs.count()) {
+                tabs.objectAtIndex(i).makeKeyAndOrderFront(None);
+            }
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (window, n);
+}
+
 #[tauri::command]
 fn open_window(app: AppHandle, path: String) -> Result<(), String> {
     create_window(&app, Some(PathBuf::from(path))).map_err(|e| e.to_string())
@@ -277,7 +309,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![read_file, take_initial_file, watch_file, open_window])
+        .invoke_handler(tauri::generate_handler![read_file, take_initial_file, watch_file, open_window, select_tab])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 let state = window.state::<AppState>();
@@ -372,6 +404,17 @@ mod tests {
         // Same file through a different spelling of the path.
         assert_eq!(window_showing(&windows, &dir.join("sub/../a.md")), Some("w1".into()));
         assert_eq!(window_showing(&windows, &dir.join("b.md")), None);
+    }
+
+    #[test]
+    fn cmd_number_picks_a_tab() {
+        assert_eq!(tab_index(1, 3), Some(0));
+        assert_eq!(tab_index(3, 3), Some(2));
+        assert_eq!(tab_index(4, 3), None); // no 4th tab: do nothing
+        assert_eq!(tab_index(9, 3), Some(2)); // 9 = last tab
+        assert_eq!(tab_index(9, 12), Some(11));
+        assert_eq!(tab_index(1, 1), Some(0));
+        assert_eq!(tab_index(0, 3), None);
     }
 
     #[test]
