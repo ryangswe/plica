@@ -1,3 +1,4 @@
+import type { DefaultAppsInfo, SetResult } from "./defaults";
 import { decodeBytes } from "./lib/decode";
 import type { FileDoc } from "./types";
 
@@ -26,6 +27,13 @@ export interface Host {
   /** Whether remote images load automatically (off by default). */
   getRemoteContent(): Promise<boolean>;
   setRemoteContent(allowed: boolean): void;
+  /** Default-app status per file type; null where the host can't tell (browser). */
+  defaultApps(): Promise<DefaultAppsInfo | null>;
+  setDefaultApps(ids: string[]): Promise<SetResult[]>;
+  defaultAppsPromptDismissed(): Promise<boolean>;
+  dismissDefaultAppsPrompt(): void;
+  /** A command queued for this window before it existed (e.g. Default Apps… with no window open). */
+  takePendingCommand(): Promise<string | null>;
   pickFile(): Promise<FileDoc | null>;
   canReadPaths: boolean;
   readPath(path: string): Promise<FileDoc>;
@@ -85,6 +93,19 @@ export function createBrowserHost(): Host {
       } catch {
         return false;
       }
+    },
+    async defaultApps() {
+      return null;
+    },
+    async setDefaultApps() {
+      return [];
+    },
+    async defaultAppsPromptDismissed() {
+      return true;
+    },
+    dismissDefaultAppsPrompt() {},
+    async takePendingCommand() {
+      return null;
     },
     setRemoteContent(allowed) {
       try {
@@ -210,6 +231,21 @@ export async function createTauriHost(): Promise<Host> {
     },
     setRemoteContent(allowed) {
       invoke("save_remote_content", { allowed }).catch(() => {});
+    },
+    async defaultApps() {
+      return invoke<DefaultAppsInfo>("default_apps").catch(() => null);
+    },
+    async setDefaultApps(ids) {
+      return invoke<SetResult[]>("set_default_apps", { ids }).catch((e) => ids.map((id) => ({ id, ok: false, error: String(e) })));
+    },
+    async defaultAppsPromptDismissed() {
+      return invoke<boolean>("default_apps_prompt_dismissed").catch(() => true);
+    },
+    dismissDefaultAppsPrompt() {
+      invoke("dismiss_default_apps_prompt").catch(() => {});
+    },
+    async takePendingCommand() {
+      return invoke<string | null>("take_pending_command").catch(() => null);
     },
   };
 }

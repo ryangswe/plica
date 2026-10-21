@@ -8,6 +8,7 @@ import { hasScheme, resolveRelative, splitFragment } from "./lib/paths";
 import { readWithRetry, staleMessage } from "./lib/reload";
 import type { RemotePolicy } from "./lib/sanitize";
 import { createFindBar } from "./find";
+import { openDefaultAppsSheet } from "./defaults";
 
 type Mode = "rendered" | "raw";
 
@@ -39,6 +40,8 @@ const bar = el(
 const staleBar = el("div", { class: "stale-bar", role: "alert", hidden: "" });
 // Offers remote images the file references (blocked by default: tracking pixels).
 const remoteBar = el("div", { class: "remote-bar", role: "status", hidden: "" });
+// Offers to make Plica the default app for Markdown (once; "Not now" is remembered).
+const defaultsBar = el("div", { class: "defaults-bar", role: "status", hidden: "" });
 const view = el("main", { class: "view-scroll", tabindex: "-1" });
 const toast = el("div", { class: "toast", role: "status", "aria-live": "polite" });
 const dropOverlay = el("div", { class: "drop-overlay", hidden: "" }, el("div", {}, "Drop to open"));
@@ -49,7 +52,7 @@ const find = createFindBar(
       ? { text: doc.text, isRaw: !!renderer.rawOnly || !renderer.render || mode === "raw", showRaw: () => setMode("raw") }
       : null,
 );
-app.append(bar, staleBar, remoteBar, find.bar, view, toast, dropOverlay);
+app.append(bar, staleBar, defaultsBar, remoteBar, find.bar, view, toast, dropOverlay);
 
 // ---- State ----------------------------------------------------------------
 
@@ -91,6 +94,49 @@ function emptyState(): HTMLElement {
 }
 
 // ---- Rendering --------------------------------------------------------------
+
+let defaultOffered = false;
+/** First Markdown file in this window: if Plica isn't the Markdown default, offer it (never by itself). */
+async function maybeOfferDefault() {
+  if (defaultOffered) return;
+  defaultOffered = true;
+  if (await host.defaultAppsPromptDismissed()) return;
+  const info = await host.defaultApps();
+  const md = info?.supported ? info.types.find((t) => t.id === "markdown") : undefined;
+  if (!md || md.isPlica) return;
+  const button = (label: string, onClick: () => void, primary = false) => {
+    const b = el("button", primary ? { class: "primary" } : {}, label);
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  defaultsBar.replaceChildren(
+    el("span", {}, `Markdown files open in ${md.extensions[0]?.app ?? "another app"}. Open them with Plica instead?`),
+    button(
+      "Make default",
+      async () => {
+        defaultsBar.hidden = true;
+        const [r] = await host.setDefaultApps(["markdown"]);
+        showToast(r?.ok ? "Plica now opens Markdown files." : `Couldn't change it: ${r?.error ?? "unknown error"}`, 3500);
+      },
+      true,
+    ),
+    button("Choose file types…", () => {
+      defaultsBar.hidden = true;
+      void showDefaultApps();
+    }),
+    button("Not now", () => {
+      defaultsBar.hidden = true;
+      host.dismissDefaultAppsPrompt();
+    }),
+  );
+  defaultsBar.hidden = false;
+}
+
+async function showDefaultApps() {
+  const info = await host.defaultApps();
+  if (!info) return showToast("Default apps can be set in the desktop app.");
+  openDefaultAppsSheet(info, (ids) => host.setDefaultApps(ids), (msg) => showToast(msg, 3500));
+}
 
 /** Remote images load automatically (the user chose "Always load"). */
 let allowRemote = false;
@@ -172,6 +218,7 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
   if (token !== renderToken) return; // a newer render started meanwhile
   view.replaceChildren(content);
   updateRemoteBar(effective === "raw" || doc.binary ? null : policy);
+  if (renderer.id === "markdown") void maybeOfferDefault();
   if (opts.keepScroll) view.scrollTop = scrollRatio * (view.scrollHeight - view.clientHeight);
   else view.scrollTop = 0;
   if (!opts.keepScroll && pendingAnchor) {
@@ -292,6 +339,7 @@ function runCommand(id: string) {
   else if (id === "find" && doc) find.show();
   else if (id === "find-next" && doc) find.next();
   else if (id === "find-prev" && doc) find.prev();
+  else if (id === "default-apps") void showDefaultApps();
 }
 darkQuery.addEventListener("change", () => void render({ keepScroll: true }));
 
@@ -378,6 +426,9 @@ async function boot() {
       void render({ keepScroll: true });
     },
   });
+  // E.g. Plica → Default Apps… chosen while no window was open: this window was made for it.
+  const pending = await host.takePendingCommand();
+  if (pending) runCommand(pending);
 }
 
 void boot();

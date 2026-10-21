@@ -70,7 +70,8 @@ Download the installer for your OS from the [Releases](../../releases) page.
 
 ### Make it the default for Markdown
 
-- **macOS:** right-click any `.md` file → **Get Info** → **Open with:** Plica → **Change All…**
+- **macOS:** Plica offers it the first time you open a Markdown file, and **Plica → Default Apps…** lets you pick
+  any of the file types below in one go. (Or the manual way: **Get Info** → **Open with:** Plica → **Change All…**)
 - **Windows:** right-click a `.md` file → **Open with** → **Choose another app** → Plica → tick **Always**.
 - **Linux:** `xdg-mime default Plica.desktop text/markdown` (or use your file manager's "Open With").
 

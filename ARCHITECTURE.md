@@ -9,6 +9,7 @@ web engine) with a TypeScript frontend and no UI framework.
 src/                     web frontend (TypeScript, no framework, Vite)
   main.ts                app shell: top bar, Preview/Raw toggle, shortcuts, live reload, link handling, history
   host.ts                platform layer: Tauri host (desktop) vs browser host (dev/tests/web demo)
+  defaults.ts            the Default Apps window
   find.ts                find-in-page bar (matches across formatting; points to Raw for off-screen matches)
   types.ts               FileDoc, Renderer, RenderContext
   renderers/             one file per type + index.ts registry (first match wins, codeRenderer is fallback)
@@ -18,6 +19,8 @@ src/                     web frontend (TypeScript, no framework, Vite)
 src-tauri/
   src/lib.rs             windows, file reading, watching, OS open events, macOS tabs
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
+  src/defaults.rs        which app opens each file type; make Plica the default (macOS: NSWorkspace + UTType)
+  src/settings.rs        settings.json (editor, recent files, remote images, prompts)
   src/menu.rs            macOS menu bar, Open Recent (AppKit-managed), Open in Editor; commands the
                          frontend owns are sent to the focused window as `menu` events
   tauri.conf.json        CSP, asset protocol, file associations, bundle settings

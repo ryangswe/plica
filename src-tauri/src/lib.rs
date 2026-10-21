@@ -17,6 +17,7 @@ use std::{
     },
 };
 
+mod defaults;
 mod encoding;
 #[cfg(target_os = "macos")]
 mod menu;
@@ -38,6 +39,8 @@ struct WindowState {
     current: Option<PathBuf>,
     /// The frontend has asked for its initial file, so it is listening for events.
     ready: bool,
+    /// A menu command to run once the window has loaded (it was opened for that command).
+    pending_command: Option<String>,
     watcher: Option<RecommendedWatcher>,
 }
 
@@ -91,6 +94,25 @@ fn read_file(path: String) -> Result<FileData, String> {
 }
 
 /// Called once by each window's frontend after it has set up its event listeners.
+/// Called by each window's frontend after loading: a command it was opened to run, if any.
+#[tauri::command]
+fn take_pending_command(window: WebviewWindow, state: State<AppState>) -> Option<String> {
+    state.windows.lock().unwrap().get_mut(window.label())?.pending_command.take()
+}
+
+/// Open an empty window that runs `command` once loaded (menu commands chosen with no window open).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn open_window_for_command(app: &AppHandle, command: &str) {
+    match create_window(app, None) {
+        Ok(label) => {
+            if let Some(w) = app.state::<AppState>().windows.lock().unwrap().get_mut(&label) {
+                w.pending_command = Some(command.to_string());
+            }
+        }
+        Err(e) => eprintln!("failed to open window: {e}"),
+    }
+}
+
 #[tauri::command]
 fn take_initial_file(window: WebviewWindow, state: State<AppState>) -> Option<String> {
     let mut windows = state.windows.lock().unwrap();
@@ -191,7 +213,8 @@ fn current_file(app: &AppHandle, label: &str) -> Option<PathBuf> {
     app.state::<AppState>().windows.lock().unwrap().get(label)?.current.clone()
 }
 
-fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<()> {
+/// Create a window (showing `path`, or empty) and return its label.
+fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String> {
     let state = app.state::<AppState>();
     let n = state.counter.fetch_add(1, Ordering::SeqCst);
     let label = format!("w{n}");
@@ -219,7 +242,7 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<()> {
         builder.center()
     };
     builder.build()?;
-    Ok(())
+    Ok(label)
 }
 
 /// The window already showing `path`, if any (compared after resolving symlinks and `..`).
@@ -340,11 +363,16 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_file,
             take_initial_file,
+            take_pending_command,
             watch_file,
             open_window,
             select_tab,
             settings::get_remote_content,
-            settings::save_remote_content
+            settings::save_remote_content,
+            defaults::default_apps,
+            defaults::set_default_apps,
+            defaults::default_apps_prompt_dismissed,
+            defaults::dismiss_default_apps_prompt
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

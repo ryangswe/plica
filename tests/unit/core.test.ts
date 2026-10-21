@@ -11,6 +11,7 @@ import { splitHighlightedLines, highlight, languageFor } from "../../src/lib/hig
 import { resolveRelative, hasScheme, splitFragment } from "../../src/lib/paths";
 import { readWithRetry, staleMessage } from "../../src/lib/reload";
 import { blockRemote, guardRemoteHtml } from "../../src/lib/sanitize";
+import { describeCurrent, joinLabels, openDefaultAppsSheet, type DefaultAppsInfo } from "../../src/defaults";
 import { countRemoteRefs } from "../../src/renderers/simple";
 import { pickRenderer } from "../../src/renderers";
 import { renderRaw } from "../../src/renderers/raw";
@@ -325,5 +326,60 @@ describe("remote content", () => {
     expect(policy.found).toBe(1);
     expect(guardRemoteHtml('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>', policy)).toContain("<rect");
     expect(countRemoteRefs('<img src="https://a/b.png"><div style="background:url(//c/d.png)"></div><a href="https://e">x</a>')).toBe(2);
+  });
+});
+
+describe("default apps", () => {
+  const ext = (e: string, app: string | null, isPlica = false) => ({ ext: e, app, isPlica });
+  const info = (): DefaultAppsInfo => ({
+    supported: true,
+    platform: "macos",
+    types: [
+      { id: "markdown", label: "Markdown", extensions: [ext("md", "Typora"), ext("markdown", "Typora")], isPlica: false },
+      { id: "json", label: "JSON", extensions: [ext("json", "Plica", true), ext("geojson", "Xcode"), ext("jsonc", null)], isPlica: false },
+      { id: "csv", label: "CSV", extensions: [ext("csv", "Plica", true)], isPlica: true },
+      { id: "log", label: "Logs", extensions: [ext("log", "Console")], isPlica: false },
+    ],
+  });
+
+  it("describes who opens each type in plain words", () => {
+    const [md, json, csv, log] = info().types;
+    expect(describeCurrent(md)).toBe("Opens in Typora");
+    expect(describeCurrent(json)).toBe("Partly Plica: .geojson opens in Xcode, .jsonc has no app");
+    expect(describeCurrent(csv)).toBe("Plica");
+    expect(describeCurrent(log)).toBe("Opens in Console");
+    expect(joinLabels(["Markdown", "CSV", "Logs"])).toBe("Markdown, CSV and Logs");
+  });
+
+  it("pre-checks only Markdown, locks types Plica already opens, and applies just the new choices", async () => {
+    const applied: string[][] = [];
+    let message = "";
+    const sheet = openDefaultAppsSheet(info(), async (ids) => (applied.push(ids), ids.map((id) => ({ id, ok: true, error: null }))), (m) => (message = m));
+    const box = (id: string) => sheet.querySelector<HTMLInputElement>(`input[data-id="${id}"]`)!;
+    expect(box("markdown").checked).toBe(true);
+    expect(box("json").checked).toBe(false);
+    expect(box("csv").checked && box("csv").disabled).toBe(true);
+    box("log").click();
+    [...sheet.querySelectorAll("button")].find((b) => b.textContent === "Apply")!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(applied).toEqual([["markdown", "log"]]);
+    expect(message).toBe("Plica now opens Markdown and Logs files.");
+    expect(document.querySelector(".sheet-backdrop")).toBeNull(); // closed
+  });
+
+  it("keeps the window open and says what failed", async () => {
+    const sheet = openDefaultAppsSheet(info(), async (ids) => ids.map((id) => ({ id, ok: false, error: "Not allowed" })), () => {});
+    [...sheet.querySelectorAll("button")].find((b) => b.textContent === "Apply")!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sheet.querySelector(".type-current.failed")?.textContent).toBe("Couldn't change: Not allowed");
+    expect(document.querySelector(".sheet-backdrop")).not.toBeNull();
+    sheet.remove();
+  });
+
+  it("explains the manual steps where apps can't set defaults (Windows)", () => {
+    const sheet = openDefaultAppsSheet({ ...info(), supported: false, platform: "windows" }, async () => [], () => {});
+    expect(sheet.textContent).toContain("Settings → Apps → Default apps");
+    expect(sheet.querySelectorAll("input").length).toBe(0);
+    sheet.remove();
   });
 });

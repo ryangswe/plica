@@ -22,7 +22,8 @@ use tauri::{AppHandle, Emitter, EventTarget, Manager, Wry};
 use tauri_plugin_dialog::DialogExt;
 
 /// Menu ids forwarded unchanged to the focused window's frontend.
-const FRONTEND_COMMANDS: &[&str] = &["toggle-raw", "reload", "back", "copy-source", "copy-path", "find", "find-next", "find-prev"];
+const FRONTEND_COMMANDS: &[&str] =
+    &["toggle-raw", "reload", "back", "copy-source", "copy-path", "find", "find-next", "find-prev", "default-apps"];
 
 /// Editors offered for "Open in Editor", most likely first. (name, bundle id)
 const EDITORS: &[(&str, &str)] = &[
@@ -137,6 +138,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             ..Default::default()
         }))
         .separator()
+        .item(&MenuItemBuilder::with_id("default-apps", "Default Apps…").build(app)?)
+        .separator()
         .services()
         .separator()
         .hide()
@@ -241,6 +244,9 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
     if FRONTEND_COMMANDS.contains(&id) {
         if let Some(label) = app.webview_windows().into_iter().find(|(_, w)| w.is_focused().unwrap_or(false)).map(|(l, _)| l) {
             let _ = app.emit_to(EventTarget::webview_window(label), "menu", id);
+        } else if id == "default-apps" {
+            // No window open (Plica keeps running on macOS): open one for it.
+            crate::open_window_for_command(app, id);
         }
         return;
     }
