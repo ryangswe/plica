@@ -13,7 +13,13 @@ FIX="$(cd "$(dirname "$0")/../fixtures" && pwd)"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 fails=0
 
-quit() { osascript -e 'quit app "Plica"' >/dev/null 2>&1 || true; for _ in $(seq 20); do pgrep -xq plica || return 0; sleep 0.25; done; }
+# Quit like Cmd+Q does (AppKit terminate). Plica stays alive when its last window closes, so make sure
+# quitting still ends the process.
+quit() {
+  osascript -e 'quit app "Plica"' >/dev/null 2>&1 || true
+  for _ in $(seq 20); do pgrep -xq plica || return 0; sleep 0.25; done
+  echo "FAIL quit: Plica is still running"; fails=$((fails + 1)); pkill -x plica || true
+}
 open_file() { open -a "$APP" "$@"; sleep "${WAIT:-2.5}"; }
 # All windows, or only the visible ones (background tabs are off screen).
 windows() { osascript -l JavaScript "$HERE/windows.js" | awk -F'\t' -v m="${1:-all}" 'm=="all" || $2=="on" {print $1}' | tr '\n' ' ' | sed 's/ $//'; }
@@ -27,6 +33,7 @@ quit
 open_file "$FIX/sample.md";              expect "cold start with a file: one window" "sample.md" "$(windows)"
 open_file "$FIX/data.csv";               expect "second file while running: new window" "data.csv sample.md" "$(windows)"
 open_file "$FIX/sample.md";              expect "reopening a file: no duplicate" "data.csv sample.md" "$(windows)"
+open -a "$APP"; sleep 1.5;               expect "Dock click with windows open: no new window" "data.csv sample.md" "$(windows)"
 quit
 open_file "$FIX/sample.md" "$FIX/app.log"; expect "cold start with two files" "app.log sample.md" "$(windows)"
 quit

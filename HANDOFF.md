@@ -143,6 +143,9 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
 
 ## Known limitations / notes
 
+- macOS: Plica keeps running with no windows (decision log). Until the native menu bar exists (roadmap 6),
+  Cmd+O does nothing then, because shortcuts live in the web page; click the Dock icon for a window.
+
 - App is unsigned → Gatekeeper / SmartScreen warnings (documented in README).
 - Name: **Plica** (Latin for "a fold"). Domain **plica.dev** (owner's Cloudflare account). Repo: private
   `ryangswe/plica` during development; later open source or a paid product (undecided, see docs/PRODUCT.md).

@@ -297,11 +297,24 @@ pub fn run() {
         .expect("error while building Plica");
 
     app.run(|_app, _event| {
-        // macOS delivers Finder "Open" / double-click as an event, not as arguments.
-        #[cfg(any(target_os = "macos", target_os = "ios"))]
-        if let tauri::RunEvent::Opened { urls } = &_event {
-            let paths = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
-            open_paths(_app, paths);
+        #[cfg(target_os = "macos")]
+        match _event {
+            // Finder "Open" / double-click arrives as an event, not as arguments.
+            tauri::RunEvent::Opened { urls } => {
+                let paths = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
+                open_paths(_app, paths);
+            }
+            // Like Preview: closing the last window keeps the app running, so the next file opens
+            // warm (~190 ms vs ~510 ms cold). `code: None` only happens when the last window
+            // closes; Cmd+Q goes through AppKit's terminate and still quits.
+            tauri::RunEvent::ExitRequested { code: None, api, .. } => api.prevent_exit(),
+            // Clicking the Dock icon with no windows open: give the user an empty window.
+            tauri::RunEvent::Reopen { .. } if _app.webview_windows().is_empty() => {
+                if let Err(e) = create_window(_app, None) {
+                    eprintln!("failed to open window: {e}");
+                }
+            }
+            _ => {}
         }
     });
 }
