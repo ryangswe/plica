@@ -1,7 +1,7 @@
 import { Marked, type Tokens } from "marked";
 import { markedHighlight } from "marked-highlight";
 import { highlight } from "../lib/highlight";
-import { sanitize } from "../lib/sanitize";
+import { blockRemote, sanitize, type RemotePolicy } from "../lib/sanitize";
 import { el, escapeHtml } from "../lib/dom";
 import { hasScheme } from "../lib/paths";
 import type { RenderContext, Renderer } from "../types";
@@ -66,9 +66,9 @@ export function splitFrontmatter(md: string): { frontmatter: string | null; body
   return { frontmatter: m[1], body: md.slice(m[0].length) };
 }
 
-/** Markdown string → sanitized HTML string (no DOM post-processing). */
-export function markdownToHtml(md: string): string {
-  return sanitize(createMarked().parse(md, { async: false }) as string);
+/** Markdown string → sanitized HTML string (no DOM post-processing). Remote images blocked by default. */
+export function markdownToHtml(md: string, remote: RemotePolicy = blockRemote()): string {
+  return sanitize(createMarked().parse(md, { async: false }) as string, remote);
 }
 
 const ALERTS: Record<string, string> = {
@@ -114,10 +114,10 @@ function fixAssets(root: HTMLElement, ctx: RenderContext) {
 /** Render markdown into a document fragment-like container. Shared with the notebook renderer. */
 export async function renderMarkdownInto(md: string, ctx: RenderContext): Promise<HTMLElement> {
   const container = el("div", { class: "markdown-body" });
-  container.innerHTML = markdownToHtml(md);
+  container.innerHTML = markdownToHtml(md, ctx.remote);
   applyAlerts(container);
   fixAssets(container, ctx);
-  await renderMermaidBlocks(container, ctx.dark);
+  await renderMermaidBlocks(container, ctx.dark, ctx.remote);
   addCopyButtons(container, "pre");
   return container;
 }

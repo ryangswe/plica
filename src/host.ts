@@ -18,9 +18,14 @@ export interface Host {
     command(id: string): void;
     /** A short message from the desktop shell, e.g. "Opening in VS Code…". */
     notice(msg: string): void;
+    /** The "load remote images automatically" preference changed (menu, another window). */
+    remoteContent(allowed: boolean): void;
   }): Promise<void>;
   /** True when a native menu bar owns the standard shortcuts (Cmd+O, Cmd+F, Cmd+/...). */
   nativeMenu: boolean;
+  /** Whether remote images load automatically (off by default). */
+  getRemoteContent(): Promise<boolean>;
+  setRemoteContent(allowed: boolean): void;
   pickFile(): Promise<FileDoc | null>;
   canReadPaths: boolean;
   readPath(path: string): Promise<FileDoc>;
@@ -43,6 +48,9 @@ interface RawFile {
   truncated: boolean;
   encoding: string;
 }
+
+const REMOTE_KEY = "plica.remoteContent";
+let remoteChanged: ((allowed: boolean) => void) | undefined;
 
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -71,7 +79,24 @@ export function createBrowserHost(): Host {
     kind: "browser",
     canReadPaths: false,
     nativeMenu: false,
-    async init({ open, dragging }) {
+    async getRemoteContent() {
+      try {
+        return localStorage.getItem(REMOTE_KEY) === "allow";
+      } catch {
+        return false;
+      }
+    },
+    setRemoteContent(allowed) {
+      try {
+        if (allowed) localStorage.setItem(REMOTE_KEY, "allow");
+        else localStorage.removeItem(REMOTE_KEY);
+      } catch {
+        /* private mode: the choice lasts for this page only */
+      }
+      remoteChanged?.(allowed);
+    },
+    async init({ open, dragging, remoteContent }) {
+      remoteChanged = remoteContent;
       input.addEventListener("change", async () => {
         const f = input.files?.[0];
         if (f) open(await fileToDoc(f));
@@ -119,6 +144,7 @@ export function createBrowserHost(): Host {
 export async function createTauriHost(): Promise<Host> {
   const { invoke, convertFileSrc } = await import("@tauri-apps/api/core");
   const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+  const { listen } = await import("@tauri-apps/api/event");
   const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
   const { openUrl } = await import("@tauri-apps/plugin-opener");
   const win = getCurrentWebviewWindow();
@@ -130,8 +156,9 @@ export async function createTauriHost(): Promise<Host> {
     kind: "tauri",
     canReadPaths: true,
     nativeMenu: /Mac/.test(navigator.platform),
-    async init({ openPath, error, dragging, command, notice }) {
+    async init({ openPath, error, dragging, command, notice, remoteContent }) {
       await win.listen<string>("open-path", (e) => openPath(e.payload));
+      await listen<boolean>("remote-content", (e) => remoteContent(e.payload)); // app-wide broadcast
       await win.listen<string>("menu", (e) => command(e.payload));
       await win.listen<string>("notice", (e) => notice(e.payload));
       await win.listen<string>("file-changed", () => changeHandler?.());
@@ -177,6 +204,12 @@ export async function createTauriHost(): Promise<Host> {
     },
     selectTab(n) {
       invoke("select_tab", { n }).catch(() => {});
+    },
+    async getRemoteContent() {
+      return invoke<boolean>("get_remote_content").catch(() => false);
+    },
+    setRemoteContent(allowed) {
+      invoke("save_remote_content", { allowed }).catch(() => {});
     },
   };
 }

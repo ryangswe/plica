@@ -20,6 +20,7 @@ use std::{
 mod encoding;
 #[cfg(target_os = "macos")]
 mod menu;
+mod settings;
 
 use encoding::decode_text;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -336,7 +337,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![read_file, take_initial_file, watch_file, open_window, select_tab])
+        .invoke_handler(tauri::generate_handler![
+            read_file,
+            take_initial_file,
+            watch_file,
+            open_window,
+            select_tab,
+            settings::get_remote_content,
+            settings::save_remote_content
+        ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 let state = window.state::<AppState>();

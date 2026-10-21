@@ -1,3 +1,5 @@
+import type { RemotePolicy } from "./lib/sanitize";
+
 /** A file loaded into the viewer. */
 export interface FileDoc {
   /** Absolute path on disk, or null when the file came from a browser upload/drop. */
@@ -20,6 +22,8 @@ export interface RenderContext {
   /** True if the file just reloaded because it changed on disk. */
   reloaded: boolean;
   dark: boolean;
+  /** Remote images: blocked unless allowed; renderers count what they found so the UI can offer them. */
+  remote: RemotePolicy;
 }
 
 export interface Renderer {

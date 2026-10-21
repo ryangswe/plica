@@ -40,6 +40,12 @@ Adding a renderer: create `src/renderers/foo.ts` exporting a `Renderer` (`id`, `
 `rawLanguage`, `render(doc, ctx)` returning an element). Add it to `renderers` in `index.ts`. Add a fixture
 and a test. If it should be an OS "Open With" target, add it to `fileAssociations` in `tauri.conf.json`.
 
+Remote content: `sanitize()` (and `guardRemoteHtml()` for Mermaid's SVG) moves remote URLs on images, media
+and SVG `<image>` to `data-remote-*` unless `ctx.remote.allow`; this has to happen on the inert parsed copy,
+because an `<img>` starts downloading as soon as it's created. The HTML preview gets its own CSP inside the
+frame. The asset protocol may read any local file (hidden folders included, so `.github/` images work) except
+common secret folders (`.ssh`, `.aws`, ...); pages can't run scripts, so they can only display what they reference.
+
 Security rules (keep them): everything from a file goes through `sanitize()` or is set via `textContent`;
 never `innerHTML` raw file content; no `eval`; keep `script-src 'self'`; links are intercepted in `main.ts`.
 

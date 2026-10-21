@@ -208,6 +208,20 @@ mark.find-hit.current { background: var(--mark-current); color: #000; }
   background: var(--del-bg);
 }
 .stale-bar[hidden] { display: none; }
+.remote-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+.remote-bar span { flex: 1 1 260px; color: var(--fg-muted); }
+.remote-bar[hidden] { display: none; }
+/* A blocked remote image keeps a small outlined spot (and its alt text) where it would be. */
+img.remote-blocked { display: inline-block; min-width: 16px; min-height: 16px; border: 1px dashed var(--border); border-radius: 3px; vertical-align: middle; }
 .notice.inline { margin: 8px 12px; max-width: none; padding: 8px 12px; }
 .data-table th.extra-col { color: var(--fg-muted); font-weight: normal; font-style: italic; }
 .toast {

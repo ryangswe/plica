@@ -236,6 +236,46 @@ test("find says when matches exist only outside the view, and shows them in Raw"
   await expect(page.getByRole("button", { name: "Show in Raw" })).toBeHidden();
 });
 
+test("remote images are blocked until the user loads them", async ({ page }) => {
+  // Record (and answer) every request that leaves localhost.
+  const remote: string[] = [];
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => {
+    remote.push(route.request().url());
+    return route.fulfill({ body: png, contentType: "image/png" });
+  });
+
+  await open(page, "remote.md");
+  const bar = page.locator(".remote-bar");
+  await expect(bar).toContainText("2 remote images");
+  await expect(page.locator(".markdown-body img.remote-blocked")).toHaveCount(2);
+  await page.waitForTimeout(300);
+  expect(remote).toEqual([]); // nothing left the machine
+  await page.screenshot({ path: `${SHOTS}/16-remote-blocked.png` });
+
+  await bar.getByRole("button", { name: "Load once" }).click();
+  await expect(bar).toBeHidden();
+  await expect(page.locator(".markdown-body img.remote-blocked")).toHaveCount(0);
+  await expect.poll(() => remote.length).toBe(2);
+
+  // "Always load" is remembered (browser build: localStorage), and can be turned off again.
+  await open(page, "remote.html"); // the HTML preview is blocked too, by a CSP inside the frame
+  await expect(bar).toContainText("a remote image");
+  await page.waitForTimeout(300);
+  expect(remote.filter((u) => u.includes("banner"))).toEqual([]);
+  await bar.getByRole("button", { name: "Always load" }).click();
+  await expect.poll(() => remote.filter((u) => u.includes("banner")).length).toBe(1);
+  await page.reload();
+  await open(page, "remote.md");
+  await expect(bar).toContainText("load automatically");
+  await bar.getByRole("button", { name: "Block them" }).click();
+  await expect(page.locator(".markdown-body img.remote-blocked")).toHaveCount(2);
+  // The HTML preview's own CSP refusing the banner is the blocking working, not an app CSP problem.
+  const expected = (v: string) => /banner\.png/.test(v);
+  expect(cspViolations.filter(expected).length).toBeGreaterThan(0);
+  cspViolations = cspViolations.filter((v) => !expected(v));
+});
+
 test("dark mode", async ({ browser }) => {
   const ctx = await browser.newContext({ colorScheme: "dark", viewport: { width: 1200, height: 820 } });
   const page = await ctx.newPage();

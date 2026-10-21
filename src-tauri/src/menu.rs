@@ -64,29 +64,6 @@ struct EditorMenu {
     current: Mutex<Option<&'static str>>,
 }
 
-fn settings_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("settings.json"))
-}
-
-/// Small JSON settings file next to the app's other data: {"editor": "...", "recent": ["..."]}.
-fn read_settings(app: &AppHandle) -> serde_json::Value {
-    settings_path(app)
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .filter(|v: &serde_json::Value| v.is_object())
-        .unwrap_or_else(|| serde_json::json!({}))
-}
-
-fn write_setting(app: &AppHandle, key: &str, value: serde_json::Value) {
-    let Some(path) = settings_path(app) else { return };
-    let mut json = read_settings(app);
-    json[key] = value;
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let _ = std::fs::write(path, serde_json::to_string_pretty(&json).unwrap_or_default());
-}
-
 const MAX_RECENT: usize = 10;
 
 /// Move `path` to the front of the recent list (no duplicates, at most `MAX_RECENT`).
@@ -110,6 +87,16 @@ pub fn recent_labels(list: &[PathBuf]) -> Vec<String> {
             }
         })
         .collect()
+}
+
+/// View → Load Remote Images.
+struct RemoteToggle(CheckMenuItem<Wry>);
+
+/// Keep the menu check in sync when the preference changes elsewhere (the in-page "Always load").
+pub fn set_remote_checked(app: &AppHandle, on: bool) {
+    if let Some(t) = app.try_state::<RemoteToggle>() {
+        let _ = t.0.set_checked(on);
+    }
 }
 
 /// File → Open Recent, kept by Plica (AppKit only fills its own recent menu in nib-based apps).
@@ -138,7 +125,7 @@ fn rebuild_recent(app: &AppHandle, menu: &RecentMenu) {
 
 fn save_recent(app: &AppHandle, files: &[PathBuf]) {
     let list = files.iter().map(|p| serde_json::Value::String(p.to_string_lossy().into_owned())).collect();
-    write_setting(app, "recent", serde_json::Value::Array(list));
+    crate::settings::write(app, "recent", serde_json::Value::Array(list));
 }
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
@@ -161,7 +148,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     let open_recent = SubmenuBuilder::with_id(app, "open-recent", "Open Recent").build()?;
 
-    let settings = read_settings(app);
+    let settings = crate::settings::read(app);
     let installed = installed_editors();
     let current = pick_editor(settings.get("editor").and_then(|v| v.as_str()), &installed);
     let open_in = MenuItemBuilder::with_id("open-in-editor", format!("Open in {}", current.map_or("Editor", editor_name)))
@@ -207,10 +194,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&MenuItemBuilder::with_id("find-prev", "Find Previous").accelerator("CmdOrCtrl+Shift+G").build(app)?)
         .build()?;
 
+    // Off by default: opening a file shouldn't tell anyone (tracking pixels in READMEs and emails).
+    let remote_toggle = CheckMenuItemBuilder::with_id("toggle-remote", "Load Remote Images")
+        .checked(crate::settings::remote_content(app))
+        .build(app)?;
+    app.manage(RemoteToggle(remote_toggle.clone()));
     let view = SubmenuBuilder::new(app, "View")
         .item(&MenuItemBuilder::with_id("toggle-raw", "Toggle Preview / Raw").accelerator("CmdOrCtrl+/").build(app)?)
         .item(&MenuItemBuilder::with_id("reload", "Reload").accelerator("CmdOrCtrl+R").build(app)?)
         .item(&MenuItemBuilder::with_id("back", "Back").accelerator("CmdOrCtrl+[").build(app)?)
+        .separator()
+        .item(&remote_toggle)
         .separator()
         .fullscreen()
         .build()?;
@@ -279,6 +273,11 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
                 open_in_editor(app, &label, editor, &path);
             }
         }
+        "toggle-remote" => {
+            // The check item has already flipped itself; save and broadcast the new state.
+            let on = app.state::<RemoteToggle>().0.is_checked().unwrap_or(false);
+            crate::settings::set_remote_content(app, on);
+        }
         "clear-recent" => {
             let menu = app.state::<RecentMenu>();
             menu.files.lock().unwrap().clear();
@@ -309,7 +308,7 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
                 let _ = item.set_checked(eid == chosen);
             }
             let _ = menu.open_in.set_text(format!("Open in {}", editor_name(chosen)));
-            write_setting(app, "editor", serde_json::Value::String(chosen.to_string()));
+            crate::settings::write(app, "editor", serde_json::Value::String(chosen.to_string()));
             if let Some((label, path)) = focused_file(app) {
                 open_in_editor(app, &label, chosen, &path);
             }

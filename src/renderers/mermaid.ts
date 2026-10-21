@@ -1,4 +1,5 @@
 import { el } from "../lib/dom";
+import { guardRemoteHtml, type RemotePolicy } from "../lib/sanitize";
 import type { Renderer } from "../types";
 
 type MermaidApi = typeof import("mermaid").default;
@@ -18,12 +19,12 @@ async function getMermaid(dark: boolean): Promise<MermaidApi> {
   return mermaid;
 }
 
-async function renderDiagram(source: string, dark: boolean): Promise<HTMLElement> {
+async function renderDiagram(source: string, dark: boolean, remote: RemotePolicy): Promise<HTMLElement> {
   const box = el("div", { class: "mermaid-diagram" });
   try {
     const mermaid = await getMermaid(dark);
     const { svg } = await mermaid.render(`plica-mermaid-${++counter}`, source);
-    box.innerHTML = svg;
+    box.innerHTML = guardRemoteHtml(svg, remote); // diagrams can reference images by URL
   } catch (err) {
     box.classList.add("render-error");
     box.append(
@@ -38,10 +39,10 @@ async function renderDiagram(source: string, dark: boolean): Promise<HTMLElement
 }
 
 /** Replace every `.mermaid-block` (from ```mermaid fences) with the rendered diagram. */
-export async function renderMermaidBlocks(root: HTMLElement, dark: boolean): Promise<void> {
+export async function renderMermaidBlocks(root: HTMLElement, dark: boolean, remote: RemotePolicy): Promise<void> {
   const blocks = [...root.querySelectorAll<HTMLElement>(".mermaid-block")];
   for (const block of blocks) {
-    block.replaceWith(await renderDiagram(block.textContent ?? "", dark));
+    block.replaceWith(await renderDiagram(block.textContent ?? "", dark, remote));
   }
 }
 
@@ -52,7 +53,7 @@ export const mermaidRenderer: Renderer = {
   rawLanguage: "plaintext",
   async render(doc, ctx) {
     const wrap = el("div", { class: "center-stage" });
-    wrap.append(await renderDiagram(doc.text, ctx.dark));
+    wrap.append(await renderDiagram(doc.text, ctx.dark, ctx.remote));
     return wrap;
   },
 };

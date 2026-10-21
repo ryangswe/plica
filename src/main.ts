@@ -6,6 +6,7 @@ import { renderRaw } from "./renderers/raw";
 import { el, formatBytes } from "./lib/dom";
 import { hasScheme, resolveRelative, splitFragment } from "./lib/paths";
 import { readWithRetry, staleMessage } from "./lib/reload";
+import type { RemotePolicy } from "./lib/sanitize";
 import { createFindBar } from "./find";
 
 type Mode = "rendered" | "raw";
@@ -36,6 +37,8 @@ const bar = el(
 );
 // Shown while the open file can't be read anymore (deleted, moved, permissions); the last content stays.
 const staleBar = el("div", { class: "stale-bar", role: "alert", hidden: "" });
+// Offers remote images the file references (blocked by default: tracking pixels).
+const remoteBar = el("div", { class: "remote-bar", role: "status", hidden: "" });
 const view = el("main", { class: "view-scroll", tabindex: "-1" });
 const toast = el("div", { class: "toast", role: "status", "aria-live": "polite" });
 const dropOverlay = el("div", { class: "drop-overlay", hidden: "" }, el("div", {}, "Drop to open"));
@@ -46,7 +49,7 @@ const find = createFindBar(
       ? { text: doc.text, isRaw: !!renderer.rawOnly || !renderer.render || mode === "raw", showRaw: () => setMode("raw") }
       : null,
 );
-app.append(bar, staleBar, find.bar, view, toast, dropOverlay);
+app.append(bar, staleBar, remoteBar, find.bar, view, toast, dropOverlay);
 
 // ---- State ----------------------------------------------------------------
 
@@ -89,11 +92,45 @@ function emptyState(): HTMLElement {
 
 // ---- Rendering --------------------------------------------------------------
 
+/** Remote images load automatically (the user chose "Always load"). */
+let allowRemote = false;
+/** Files this window may load remote images for, after "Load once". */
+const loadOnce = new Set<string>();
+const docKey = (d: FileDoc) => d.path ?? `upload:${d.name}`;
+
+function updateRemoteBar(policy: RemotePolicy | null) {
+  const found = policy?.found ?? 0;
+  const button = (label: string, onClick: () => void) => {
+    const b = el("button", {}, label);
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  if (found && policy && !policy.allow) {
+    remoteBar.replaceChildren(
+      el("span", {}, `This file links to ${found === 1 ? "a remote image" : `${found} remote images`}. Plica blocks them so nobody can tell you opened it.`),
+      button("Load once", () => {
+        if (doc) loadOnce.add(docKey(doc));
+        void render({ keepScroll: true });
+      }),
+      button("Always load", () => {
+        host.setRemoteContent(true);
+        showToast(host.nativeMenu ? "Remote images will load. Turn this off in View → Load Remote Images." : "Remote images will load.", 3500);
+      }),
+    );
+    remoteBar.hidden = false;
+  } else if (found && allowRemote && !host.nativeMenu) {
+    // No menu bar to turn it off again on this platform: offer it here.
+    remoteBar.replaceChildren(el("span", {}, "Remote images load automatically."), button("Block them", () => host.setRemoteContent(false)));
+    remoteBar.hidden = false;
+  } else remoteBar.hidden = true;
+}
+
 /** Section to scroll to once the next file has rendered (from a link like other.md#setup). */
 let pendingAnchor: string | null = null;
 
 async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
   const token = ++renderToken;
+  let policy: RemotePolicy | null = null;
   if (!doc || !renderer) {
     view.replaceChildren(emptyState());
     modeSwitch.hidden = copyBtn.hidden = true;
@@ -120,7 +157,9 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
       state: fileState,
       reloaded: !!opts.reloaded,
       dark: darkQuery.matches,
+      remote: { allow: allowRemote || loadOnce.has(docKey(current)), found: 0 },
     };
+    policy = ctx.remote;
     try {
       content.append(await renderer.render!(current, ctx));
     } catch (err) {
@@ -132,6 +171,7 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
   }
   if (token !== renderToken) return; // a newer render started meanwhile
   view.replaceChildren(content);
+  updateRemoteBar(effective === "raw" || doc.binary ? null : policy);
   if (opts.keepScroll) view.scrollTop = scrollRatio * (view.scrollHeight - view.clientHeight);
   else view.scrollTop = 0;
   if (!opts.keepScroll && pendingAnchor) {
@@ -322,6 +362,7 @@ function encodingLabel(name: string): string {
 
 async function boot() {
   host = isTauri() ? await createTauriHost() : createBrowserHost();
+  allowRemote = await host.getRemoteContent();
   document.documentElement.dataset.host = host.kind;
   document.documentElement.dataset.platform = isMac ? "mac" : "other";
   void render();
@@ -332,6 +373,10 @@ async function boot() {
     dragging: (on) => (dropOverlay.hidden = !on),
     command: runCommand,
     notice: (m) => showToast(m, 2500),
+    remoteContent: (allowed) => {
+      allowRemote = allowed;
+      void render({ keepScroll: true });
+    },
   });
 }
 

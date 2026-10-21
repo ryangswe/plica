@@ -10,13 +10,15 @@ import { ansiToHtml, stripAnsi } from "../../src/lib/ansi";
 import { splitHighlightedLines, highlight, languageFor } from "../../src/lib/highlight";
 import { resolveRelative, hasScheme, splitFragment } from "../../src/lib/paths";
 import { readWithRetry, staleMessage } from "../../src/lib/reload";
+import { blockRemote, guardRemoteHtml } from "../../src/lib/sanitize";
+import { countRemoteRefs } from "../../src/renderers/simple";
 import { pickRenderer } from "../../src/renderers";
 import { renderRaw } from "../../src/renderers/raw";
 import type { FileDoc, RenderContext } from "../../src/types";
 
 const fixture = (name: string) => readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8");
 const doc = (name: string, text = fixture(name)): FileDoc => ({ path: `/tmp/fx/${name}`, name, text, size: text.length, binary: false, truncated: false, encoding: "UTF-8" });
-const ctx = (): RenderContext => ({ resolveAsset: (r) => `asset://${r}`, state: {}, reloaded: false, dark: false });
+const ctx = (): RenderContext => ({ resolveAsset: (r) => `asset://${r}`, state: {}, reloaded: false, dark: false, remote: { allow: false, found: 0 } });
 
 describe("markdown", () => {
   it("renders GFM features with heading ids", () => {
@@ -280,5 +282,48 @@ describe("copy buttons", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(copied).toEqual(["npm install plica\nnpm test"]);
     expect(buttons[0].classList.contains("copied")).toBe(true);
+  });
+});
+
+describe("remote content", () => {
+  const md = [
+    "![badge](https://img.shields.io/badge/a-b-green)",
+    '<img src="//example.com/pixel.png" alt="p">',
+    '<video poster="https://example.com/p.jpg"></video>',
+    '<svg><image href="https://example.com/i.png"></image></svg>',
+    "![local](img/logo.png) [link](https://example.com)",
+  ].join("\n\n");
+
+  it("is blocked by default, and counted", () => {
+    const policy = blockRemote();
+    const html = markdownToHtml(md, policy);
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    expect(policy.found).toBe(4);
+    for (const el of root.querySelectorAll("img, video, image")) {
+      for (const a of ["src", "poster", "href"]) expect(el.getAttribute(a) ?? "").not.toMatch(/^(https?:)?\/\//);
+    }
+    expect(root.querySelector("img.remote-blocked")?.getAttribute("data-remote-src")).toBe("https://img.shields.io/badge/a-b-green");
+    expect(root.querySelector('img[alt="local"]')?.getAttribute("src")).toBe("img/logo.png"); // local stays
+    expect(root.querySelector("a")?.getAttribute("href")).toBe("https://example.com"); // links aren't loads
+  });
+
+  it("loads when allowed, without a referrer", () => {
+    const policy = { allow: true, found: 0 };
+    const root = document.createElement("div");
+    root.innerHTML = markdownToHtml(md, policy);
+    expect(policy.found).toBe(4);
+    const img = root.querySelector('img[alt="badge"]')!;
+    expect(img.getAttribute("src")).toBe("https://img.shields.io/badge/a-b-green");
+    expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
+  });
+
+  it("guards SVG that skips the sanitizer (Mermaid) and counts HTML page references", () => {
+    const policy = blockRemote();
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.com/x.png"/></svg>';
+    expect(guardRemoteHtml(svg, policy)).not.toMatch(/\s(xlink:)?href="https:/);
+    expect(policy.found).toBe(1);
+    expect(guardRemoteHtml('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>', policy)).toContain("<rect");
+    expect(countRemoteRefs('<img src="https://a/b.png"><div style="background:url(//c/d.png)"></div><a href="https://e">x</a>')).toBe(2);
   });
 });

@@ -15,6 +15,8 @@ Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, insta
   the app is a few MB instead of a 150 MB Electron bundle.
 - **Opens like any other file.** Set it as the default app for `.md` (and friends) and double-click.
 - **Read-only and safe.** Files are untrusted: scripts never run, HTML is sanitized, HTML pages preview in a sandbox.
+- **Private.** No telemetry, no accounts. Remote images in a file (badges, tracking pixels) load only when you
+  say so: **Load once**, or **Always load** (macOS: View → Load Remote Images).
 - **Live reload.** Edit the file in your editor; the view updates on save (great for logs with *Follow* on).
 - **Works on macOS, Windows and Linux.**
 

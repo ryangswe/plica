@@ -55,7 +55,7 @@ async function renderOutput(out: Output, ctx: RenderContext): Promise<HTMLElemen
   }
   if (data["text/html"]) {
     const div = el("div", { class: "nb-html" });
-    div.innerHTML = sanitize(join(data["text/html"]));
+    div.innerHTML = sanitize(join(data["text/html"]), ctx.remote);
     return div;
   }
   if (data["text/markdown"]) {
