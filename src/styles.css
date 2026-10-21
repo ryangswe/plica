@@ -167,6 +167,8 @@ kbd {
   box-shadow: var(--shadow);
 }
 .find-count { min-width: 64px; text-align: center; font-size: 12px; }
+.find-elsewhere { font-size: 12px; white-space: nowrap; }
+.find-elsewhere:empty { display: none; }
 mark.find-hit { background: var(--mark); color: inherit; border-radius: 2px; }
 mark.find-hit.current { background: var(--mark-current); color: #000; }
 
@@ -199,6 +201,15 @@ mark.find-hit.current { background: var(--mark-current); color: #000; }
   gap: 4px;
 }
 .notice.error { border-color: var(--del-fg); background: var(--del-bg); }
+.stale-bar {
+  padding: 6px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--del-bg);
+}
+.stale-bar[hidden] { display: none; }
+.notice.inline { margin: 8px 12px; max-width: none; padding: 8px 12px; }
+.data-table th.extra-col { color: var(--fg-muted); font-weight: normal; font-style: italic; }
 .toast {
   position: fixed;
   left: 50%;

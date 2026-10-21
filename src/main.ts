@@ -4,7 +4,8 @@ import { createBrowserHost, createTauriHost, isTauri, type Host } from "./host";
 import { pickRenderer, rawLanguageFor, renderers } from "./renderers";
 import { renderRaw } from "./renderers/raw";
 import { el, formatBytes } from "./lib/dom";
-import { hasScheme, resolveRelative } from "./lib/paths";
+import { hasScheme, resolveRelative, splitFragment } from "./lib/paths";
+import { readWithRetry, staleMessage } from "./lib/reload";
 import { createFindBar } from "./find";
 
 type Mode = "rendered" | "raw";
@@ -33,11 +34,19 @@ const bar = el(
   copyBtn,
   openBtn,
 );
+// Shown while the open file can't be read anymore (deleted, moved, permissions); the last content stays.
+const staleBar = el("div", { class: "stale-bar", role: "alert", hidden: "" });
 const view = el("main", { class: "view-scroll", tabindex: "-1" });
 const toast = el("div", { class: "toast", role: "status", "aria-live": "polite" });
 const dropOverlay = el("div", { class: "drop-overlay", hidden: "" }, el("div", {}, "Drop to open"));
-const find = createFindBar(() => view.querySelector<HTMLElement>(".view-content"));
-app.append(bar, find.bar, view, toast, dropOverlay);
+const find = createFindBar(
+  () => view.querySelector<HTMLElement>(".view-content"),
+  () =>
+    doc && renderer && !doc.binary
+      ? { text: doc.text, isRaw: !!renderer.rawOnly || !renderer.render || mode === "raw", showRaw: () => setMode("raw") }
+      : null,
+);
+app.append(bar, staleBar, find.bar, view, toast, dropOverlay);
 
 // ---- State ----------------------------------------------------------------
 
@@ -79,6 +88,9 @@ function emptyState(): HTMLElement {
 }
 
 // ---- Rendering --------------------------------------------------------------
+
+/** Section to scroll to once the next file has rendered (from a link like other.md#setup). */
+let pendingAnchor: string | null = null;
 
 async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
   const token = ++renderToken;
@@ -122,6 +134,10 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
   view.replaceChildren(content);
   if (opts.keepScroll) view.scrollTop = scrollRatio * (view.scrollHeight - view.clientHeight);
   else view.scrollTop = 0;
+  if (!opts.keepScroll && pendingAnchor) {
+    scrollToAnchor(pendingAnchor);
+    pendingAnchor = null;
+  }
   find.refresh();
   // Let arrow keys / PageDown / Space scroll right away, unless the user is typing somewhere.
   const active = document.activeElement;
@@ -130,6 +146,7 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
 
 function setDoc(next: FileDoc, opts: { reloaded?: boolean; pushHistory?: boolean } = {}) {
   const samePath = doc?.path != null && doc.path === next.path;
+  staleBar.hidden = true; // whatever we're showing now was just read successfully
   if (!samePath) {
     fileState = {};
     mode = "rendered";
@@ -149,9 +166,19 @@ function setDoc(next: FileDoc, opts: { reloaded?: boolean; pushHistory?: boolean
   void render({ reloaded: opts.reloaded, keepScroll: samePath });
 }
 
-async function openPath(path: string, opts: { pushHistory?: boolean } = {}) {
+/** Scroll to the element with this id (or a named anchor). Returns false if there's none. */
+function scrollToAnchor(id: string | null): boolean {
+  if (!id) return false;
+  const target = view.querySelector(`[id="${CSS.escape(id)}"]`) ?? view.querySelector(`[name="${CSS.escape(id)}"]`);
+  target?.scrollIntoView({ block: "start" });
+  return !!target;
+}
+
+async function openPath(path: string, opts: { pushHistory?: boolean; anchor?: string | null } = {}) {
   try {
-    setDoc(await host.readPath(path), opts);
+    const next = await host.readPath(path);
+    pendingAnchor = opts.anchor ?? null;
+    setDoc(next, opts);
   } catch (err) {
     showToast(`Couldn't open: ${String((err as Error)?.message ?? err)}`, 3500);
   }
@@ -162,14 +189,19 @@ function onFileChanged() {
   clearTimeout(reloadTimer);
   reloadTimer = window.setTimeout(async () => {
     if (!doc?.path) return;
-    try {
-      const fresh = await host.readPath(doc.path);
-      if (fresh.text === doc.text) return;
-      setDoc(fresh, { reloaded: true });
-      showToast("Reloaded");
-    } catch {
-      /* file may be mid-save or deleted; ignore */
+    const path = doc.path;
+    const r = await readWithRetry(() => host.readPath(path));
+    if (doc?.path !== path) return; // switched files meanwhile
+    if (!r.ok) {
+      staleBar.textContent = staleMessage(r.error);
+      staleBar.title = r.error;
+      staleBar.hidden = false;
+      return;
     }
+    staleBar.hidden = true;
+    if (r.value.text === doc.text) return;
+    setDoc(r.value, { reloaded: true });
+    showToast("Reloaded");
   }, 150);
 }
 
@@ -219,9 +251,7 @@ view.addEventListener("click", (e) => {
   e.preventDefault();
   if (!href) return;
   if (href.startsWith("#")) {
-    const id = decodeURIComponent(href.slice(1));
-    const target = view.querySelector(`[id="${CSS.escape(id)}"]`) ?? view.querySelector(`[name="${CSS.escape(id)}"]`);
-    target?.scrollIntoView({ block: "start" });
+    scrollToAnchor(splitFragment(href).fragment);
     return;
   }
   if (hasScheme(href)) {
@@ -230,8 +260,10 @@ view.addEventListener("click", (e) => {
   }
   if (doc?.path && host.canReadPaths) {
     const target = resolveRelative(doc.path, href);
+    const anchor = splitFragment(href).fragment; // other.md#setup lands on the "setup" heading
     if (e.metaKey || e.ctrlKey) host.openInNewWindow(target);
-    else void openPath(target);
+    else if (target === doc.path) scrollToAnchor(anchor);
+    else void openPath(target, { anchor });
   } else {
     showToast("Linked files open in the desktop app");
   }

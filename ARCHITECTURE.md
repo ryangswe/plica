@@ -9,11 +9,11 @@ web engine) with a TypeScript frontend and no UI framework.
 src/                     web frontend (TypeScript, no framework, Vite)
   main.ts                app shell: top bar, Preview/Raw toggle, shortcuts, live reload, link handling, history
   host.ts                platform layer: Tauri host (desktop) vs browser host (dev/tests/web demo)
-  find.ts                find-in-page bar
+  find.ts                find-in-page bar (matches across formatting; points to Raw for off-screen matches)
   types.ts               FileDoc, Renderer, RenderContext
   renderers/             one file per type + index.ts registry (first match wins, codeRenderer is fallback)
     raw.ts               line-numbered highlighted source (used for every Raw view)
-  lib/                   highlight (highlight.js), sanitize (DOMPurify), ansi, paths, decode, dom helpers
+  lib/                   highlight (highlight.js), sanitize (DOMPurify), ansi, paths, decode, reload, dom helpers
   styles.css             all styling; CSS variables for light/dark
 src-tauri/
   src/lib.rs             windows, file reading, watching, OS open events, macOS tabs
@@ -31,7 +31,8 @@ Flow: Rust creates a window per file and stores the path as "pending". The front
 then calls `take_initial_file`. Files opened later (macOS Opened event, second launch) either reuse an empty
 window (`open-path` event) or create a new one. `read_file` returns `{path, name, text, size, binary,
 truncated, encoding}` (64 MB cap; zero bytes that aren't UTF-16 = binary). `watch_file` watches the parent dir and emits `file-changed`
-to that window only; the frontend debounces and re-reads.
+to that window only (changes and removals); the frontend debounces and re-reads, retrying briefly, and shows a
+"moved or deleted" bar if the file stays unreadable.
 
 Adding a renderer: create `src/renderers/foo.ts` exporting a `Renderer` (`id`, `label`, `extensions`,
 `rawLanguage`, `render(doc, ctx)` returning an element). Add it to `renderers` in `index.ts`. Add a fixture

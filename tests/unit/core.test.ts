@@ -8,7 +8,8 @@ import { detectLevel, logRenderer } from "../../src/renderers/log";
 import { notebookRenderer } from "../../src/renderers/notebook";
 import { ansiToHtml, stripAnsi } from "../../src/lib/ansi";
 import { splitHighlightedLines, highlight, languageFor } from "../../src/lib/highlight";
-import { resolveRelative, hasScheme } from "../../src/lib/paths";
+import { resolveRelative, hasScheme, splitFragment } from "../../src/lib/paths";
+import { readWithRetry, staleMessage } from "../../src/lib/reload";
 import { pickRenderer } from "../../src/renderers";
 import { renderRaw } from "../../src/renderers/raw";
 import type { FileDoc, RenderContext } from "../../src/types";
@@ -75,8 +76,39 @@ describe("json", () => {
       expect(r.value).toEqual({ url: "http://x//y", a: [1, 2] });
     }
   });
+  it("never edits commas or comment markers inside strings (JSONC)", () => {
+    const r = parseJsonLenient('{"label":",}", "list":"a,]", "path":"/*not a comment*/",}');
+    expect(r.ok && r.value).toEqual({ label: ",}", list: "a,]", path: "/*not a comment*/" });
+  });
+  it("shows numbers JavaScript can't hold exactly as written", () => {
+    const r = parseJsonLenient('{"id":9007199254740993,"small":42,"pi":3.14159265358979323846,"huge":1e400,"s":"9007199254740993"}');
+    expect(r.ok).toBe(true);
+    const v = (r.ok ? r.value : {}) as Record<string, unknown>;
+    expect(String(v.id)).toBe("9007199254740993");
+    expect(v.small).toBe(42);
+    expect(String(v.pi)).toBe("3.14159265358979323846");
+    expect(String(v.huge)).toBe("1e400");
+    expect(v.s).toBe("9007199254740993");
+    const lines = parseJsonLines('{"id":9007199254740993}\n{"id":1}');
+    expect(lines.ok && String((lines.value as { id: unknown }[])[0].id)).toBe("9007199254740993");
+    // Also in JSONC files.
+    const jsonc = parseJsonLenient('{"id":9007199254740993, // c\n}');
+    expect(jsonc.ok && String((jsonc.value as { id: unknown }).id)).toBe("9007199254740993");
+  });
+  it("renders exact numbers in the tree", () => {
+    const out = jsonRenderer.render!(doc("big.json", '{"id":9007199254740993}'), ctx()) as HTMLElement;
+    expect(out.querySelector(".j-num")?.textContent).toBe("9007199254740993");
+  });
+  it("keeps a __proto__ key as data", () => {
+    const r = parseJsonLenient('{"__proto__":{"x":1},"n":12345678901234567}');
+    const v = (r.ok ? r.value : {}) as Record<string, unknown>;
+    expect(Object.keys(v)).toEqual(["__proto__", "n"]);
+    expect(({} as Record<string, unknown>).x).toBeUndefined();
+  });
   it("reports errors", () => {
     expect(parseJsonLenient("{nope").ok).toBe(false);
+    expect(parseJsonLenient('{"a":1 "b":2}').ok).toBe(false);
+    expect(parseJsonLenient('{"a":12345678901234567,}x').ok).toBe(false);
   });
   it("parses JSON lines, skipping blanks and reporting the bad line", () => {
     const r = parseJsonLines(fixture("events.jsonl"));
@@ -94,9 +126,24 @@ describe("json", () => {
 
 describe("csv", () => {
   it("handles quoted fields", () => {
-    const rows = parseDelimited(fixture("data.csv"), "");
+    const { rows, problems } = parseDelimited(fixture("data.csv"), "");
     expect(rows[3][1]).toBe("pandas, the library");
     expect(rows.length).toBe(7);
+    expect(problems).toEqual([]);
+  });
+  it("never drops fields that appear late in the file, and says so", () => {
+    const lines = ["a,b,c", ...Array.from({ length: 600 }, (_, i) => (i === 549 ? "1,2,3,EXTRA" : "1,2,3"))];
+    const out = csvRenderer.render!(doc("wide.csv", lines.join("\n")), ctx()) as HTMLElement;
+    expect(out.querySelectorAll("th[data-col]").length).toBe(4);
+    expect(out.querySelector("th.extra-col")?.textContent).toBe("Column 4");
+    expect(out.querySelector(".notice")?.textContent).toMatch(/1 row has a different number of fields than the header \(row 550\)/);
+  });
+  it("reports malformed quoting", () => {
+    const { problems } = parseDelimited('a,b\n"unclosed,2\n3,4\n', "");
+    expect(problems.join(" ")).toMatch(/quote/i);
+  });
+  it("treats a one-column file as fine", () => {
+    expect(parseDelimited("name\nada\ngrace\n", "").problems).toEqual([]);
   });
   it("renders a sortable table with numeric sort", () => {
     const c = ctx();
@@ -190,5 +237,34 @@ describe("helpers", () => {
     expect(pickRenderer({ name: "weird.xyz" }).id).toBe("code");
     expect(languageFor("Dockerfile", "")).toBe("dockerfile");
     expect(languageFor(".env.local", "local")).toBe("bash");
+  });
+});
+
+describe("link fragments", () => {
+  it("keeps the section of a link to another file", () => {
+    expect(splitFragment("other.md#section")).toEqual({ path: "other.md", fragment: "section" });
+    expect(splitFragment("docs/a%20b.md#Set%20up")).toEqual({ path: "docs/a%20b.md", fragment: "Set up" });
+    expect(splitFragment("other.md")).toEqual({ path: "other.md", fragment: null });
+    expect(splitFragment("other.md#")).toEqual({ path: "other.md", fragment: null });
+    expect(resolveRelative("/docs/a.md", "other.md#section")).toBe("/docs/other.md");
+  });
+});
+
+describe("reload", () => {
+  const noSleep = async () => {};
+  it("retries while an editor is mid-save, then succeeds", async () => {
+    let calls = 0;
+    const r = await readWithRetry(async () => {
+      if (++calls < 3) throw new Error("No such file or directory (os error 2)");
+      return "fresh";
+    }, [0, 300, 1000], noSleep);
+    expect(r).toEqual({ ok: true, value: "fresh" });
+  });
+  it("reports a file that stays gone, in plain words", async () => {
+    const r = await readWithRetry(async () => { throw new Error("/x/a.md: No such file or directory (os error 2)"); }, [0, 1], noSleep);
+    expect(r.ok).toBe(false);
+    expect(staleMessage(r.ok ? "" : r.error)).toMatch(/^This file was moved or deleted\. You're seeing the last version/);
+    expect(staleMessage("Permission denied (os error 13)")).toMatch(/isn't allowed/);
+    expect(staleMessage("weird")).toMatch(/can't read this file right now/);
   });
 });

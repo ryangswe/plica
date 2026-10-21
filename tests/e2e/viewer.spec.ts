@@ -185,6 +185,28 @@ test("find highlights matches and opens collapsed sections", async ({ page }) =>
   await expect(page.locator("mark.find-hit")).toHaveCount(0);
 });
 
+test("find matches across syntax highlighting", async ({ page }) => {
+  await open(page, "hello.py");
+  await page.keyboard.press(`${mod}+KeyF`);
+  await page.getByPlaceholder("Find…").fill("def main"); // "def" is a highlighted keyword span
+  await expect(page.locator(".find-count")).toHaveText("1 / 1");
+  // One match made of several highlighted pieces.
+  expect((await page.locator("mark.find-hit.current").allTextContents()).join("")).toBe("def main");
+  await expect(page.locator(".find-elsewhere")).toBeHidden();
+});
+
+test("find says when matches exist only outside the view, and shows them in Raw", async ({ page }) => {
+  await open(page, "package.json");
+  await page.keyboard.press(`${mod}+KeyF`);
+  await page.getByPlaceholder("Find…").fill("deep"); // inside a collapsed JSON node
+  await expect(page.locator(".find-count")).toHaveText("No matches here");
+  await expect(page.locator(".find-elsewhere")).toHaveText("1 more only in the source");
+  await page.getByRole("button", { name: "Show in Raw" }).click();
+  await expect(page.locator(".raw")).toBeVisible();
+  await expect(page.locator(".find-count")).toHaveText("1 / 1");
+  await expect(page.getByRole("button", { name: "Show in Raw" })).toBeHidden();
+});
+
 test("dark mode", async ({ browser }) => {
   const ctx = await browser.newContext({ colorScheme: "dark", viewport: { width: 1200, height: 820 } });
   const page = await ctx.newPage();

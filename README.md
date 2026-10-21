@@ -22,7 +22,7 @@ Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, insta
 
 | File | Preview |
 |---|---|
-| Markdown (`.md`, `.markdown`, `.mdx`…) | GitHub-style: tables, task lists, alerts (`> [!NOTE]`), syntax-highlighted code, Mermaid diagrams, front matter, table of contents, relative images and links |
+| Markdown (`.md`, `.markdown`; `.mdx` as plain Markdown, components aren't run) | GitHub-style: tables, task lists, alerts (`> [!NOTE]`), syntax-highlighted code, Mermaid diagrams, front matter, table of contents, relative images and links |
 | JSON / JSONC / JSON Lines | Collapsible tree, expand/collapse all; tolerates comments and trailing commas (`tsconfig.json`) |
 | CSV / TSV | Table with sticky header, click-to-sort (numeric aware), filter |
 | Jupyter (`.ipynb`) | Markdown and code cells with outputs: text, tables, images, errors |
