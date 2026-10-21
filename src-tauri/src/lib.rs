@@ -223,21 +223,20 @@ fn paths_from_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<Pa
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let builder = tauri::Builder::default();
 
     // On Windows/Linux, double-clicking a second file starts a second process;
-    // forward its arguments to the running app instead.
+    // forward its arguments to the running app instead. (macOS keeps one process
+    // and sends RunEvent::Opened, so the plugin isn't needed there.)
     #[cfg(any(target_os = "windows", target_os = "linux"))]
-    {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            let paths = paths_from_args(argv.into_iter().skip(1), Path::new(&cwd));
-            if paths.is_empty() {
-                let _ = create_window(app, None);
-            } else {
-                open_paths(app, paths);
-            }
-        }));
-    }
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        let paths = paths_from_args(argv.into_iter().skip(1), Path::new(&cwd));
+        if paths.is_empty() {
+            let _ = create_window(app, None);
+        } else {
+            open_paths(app, paths);
+        }
+    }));
 
     let app = builder
         .plugin(tauri_plugin_dialog::init())
