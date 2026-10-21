@@ -17,7 +17,8 @@ src/                     web frontend (TypeScript, no framework, Vite)
   lib/                   highlight (highlight.js), sanitize (DOMPurify), ansi, paths, decode, reload, dom helpers
   styles.css             all styling; CSS variables for light/dark
 src-tauri/
-  src/lib.rs             windows, file reading, watching, OS open events, macOS tabs
+  src/lib.rs             windows, OS open events, watching, macOS tabs, startup
+  src/files.rs           reading files for the frontend (size cap, binary, encodings); which watch events matter
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
   src/defaults.rs        which app opens each file type; make Plica the default (macOS: NSWorkspace + UTType)
   src/chrome.rs          macOS: tells each window when the tab bar shows or it goes full screen (the toolbar
