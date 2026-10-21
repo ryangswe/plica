@@ -387,6 +387,8 @@ button.primary:hover { filter: brightness(1.08); background: var(--accent); }
 .render-error .error-title { font-weight: 600; }
 .render-error .error-detail { font-size: 13px; margin: 4px 0 8px; white-space: pre-wrap; }
 .center-stage { padding: 32px; display: grid; place-items: center; min-height: 100%; }
+/* The grid item shrinks to fit, and Mermaid's SVG is width=100%, which would collapse to 300px. */
+.center-stage > .mermaid-diagram { width: 100%; }
 .checker {
   background-color: var(--bg-soft);
   background-image: linear-gradient(45deg, var(--bg-sunk) 25%, transparent 25%), linear-gradient(-45deg, var(--bg-sunk) 25%, transparent 25%),
