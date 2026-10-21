@@ -25,8 +25,11 @@ Working and tested on Linux (in a headless X server):
   WebKitGTK). The installed .deb was tested end to end: opening a file through its desktop entry (what a
   file manager does on double-click) shows the file rendered. A custom desktop template
   (`src-tauri/linux/plica.desktop`) adds the `%F` the default template was missing.
-- Tests: 23 unit tests (vitest + jsdom), 15 browser e2e tests (Playwright against `vite preview`, which
-  sends the same CSP as the app, and the tests fail on any CSP violation), 3 Rust unit tests.
+- Tests: 23 unit tests (vitest + jsdom), 16 browser e2e tests run in both Chromium and WebKit (Playwright
+  against `vite preview`, which sends the same CSP as the app, and the tests fail on any CSP violation;
+  screenshots in `test-results/screens/<browser>/`), 3 Rust unit tests. Note: locally, Playwright reuses
+  whatever is on port 1420, so stop `tauri dev` before `npm run test:e2e` or it tests the dev server
+  without the CSP.
 - CI (`.github/workflows/ci.yml`): typecheck, unit, e2e, clippy + cargo test. Pushes check Linux only (private-repo
   minutes: macOS runners bill 10x); "Run workflow" manually checks macOS + Windows too.
 - Release (`.github/workflows/release.yml`): push a `v*` tag → draft GitHub Release with .dmg (Apple Silicon
@@ -40,7 +43,12 @@ per the Tauri docs but untested.
 1. ~~`npm install && npm test && npm run test:e2e` — should all pass.~~ **Done on macOS** (2026-10-21, Apple
    Silicon, macOS 26.6, Node 24, Rust 1.99): typecheck, unit, e2e, clippy and cargo test all pass. Clippy
    needed one fix (an `unused_mut` that only shows up on macOS). Windows still unchecked.
-2. `npm run tauri dev` — app opens with the empty state; drag a file in; try every fixture in `tests/fixtures/`.
+2. ~~`npm run tauri dev` — app opens with the empty state; drag a file in; try every fixture in `tests/fixtures/`.~~
+   **Done on macOS** (2026-10-21): every fixture renders correctly in WKWebView, in dark mode too; window
+   titles, cascading, local images (asset protocol, paths with spaces) and live reload (rename-save and
+   in-place write) work. Fixed along the way (not WebKit-specific): standalone Mermaid diagrams collapsed
+   to 300px, the SVG checkerboard stopped short of the window bottom, the HTML preview had a 5px stray
+   scroll. Keyboard shortcuts, drag & drop and Copy still need a manual check (step 3).
 3. `npm run tauri build`, then install/open the built app and check:
    - **macOS double-click flow**: set Plica as the default for `.md` (Get Info → Open with → Change All),
      quit Plica, double-click a `.md` in Finder. Expected: exactly one window showing that file (macOS
