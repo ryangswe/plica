@@ -1,49 +1,120 @@
 import { el, toolbar } from "../lib/dom";
 import type { Renderer } from "../types";
 
-/** Remove line and block comments and trailing commas (outside strings), for tsconfig-style JSONC. */
-export function stripJsonComments(src: string): string {
-  let out = "";
-  let i = 0;
-  let inStr = false;
-  while (i < src.length) {
-    const c = src[i];
-    if (inStr) {
-      out += c;
-      if (c === "\\") {
-        out += src[i + 1] ?? "";
-        i += 2;
-        continue;
-      }
-      if (c === '"') inStr = false;
-      i++;
-    } else if (c === '"') {
-      inStr = true;
-      out += c;
-      i++;
-    } else if (c === "/" && src[i + 1] === "/") {
-      while (i < src.length && src[i] !== "\n") i++;
-    } else if (c === "/" && src[i + 1] === "*") {
-      i += 2;
-      while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++;
-      i += 2;
-    } else {
-      out += c;
-      i++;
-    }
+/** A number shown exactly as written because a JS number would change it (big integers, long decimals). */
+export class ExactNumber {
+  constructor(readonly text: string) {}
+  toString(): string {
+    return this.text;
   }
-  return out.replace(/,(\s*[}\]])/g, "$1");
+}
+
+/**
+ * 16+ digits or a 3-digit exponent: JSON.parse might round it (9007199254740993 → …992) or overflow it.
+ * False positives (e.g. digits inside a string) only cost a slower, still exact, parse.
+ */
+const MAYBE_INEXACT = /(?:\d\.?){16,}|[eE][+-]?\d{3,}/;
+
+/**
+ * A small exact JSON parser, used when JSON.parse would lose information: numbers that don't fit a JS
+ * number become `ExactNumber`s, and in `lenient` mode `//` and `/* *\/` comments and trailing commas
+ * (outside strings) are allowed, as in tsconfig.json.
+ */
+export function parseJsonExact(src: string, lenient: boolean): unknown {
+  let i = 0;
+  const fail = (what: string): never => {
+    const before = src.slice(0, i);
+    const line = before.split("\n").length;
+    const col = i - before.lastIndexOf("\n");
+    throw new SyntaxError(`${what} at line ${line}, column ${col}`);
+  };
+  const skip = () => {
+    for (;;) {
+      const c = src[i];
+      if (c === " " || c === "\t" || c === "\n" || c === "\r") i++;
+      else if (lenient && c === "/" && src[i + 1] === "/") while (i < src.length && src[i] !== "\n") i++;
+      else if (lenient && c === "/" && src[i + 1] === "*") {
+        const end = src.indexOf("*/", i + 2);
+        if (end < 0) fail("Unclosed comment");
+        i = end + 2;
+      } else return;
+    }
+  };
+  const NUMBER = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+  const value = (): unknown => {
+    skip();
+    const c = src[i];
+    if (c === "{" || c === "[") {
+      const isArr = c === "[";
+      const close = isArr ? "]" : "}";
+      const out: unknown[] | Record<string, unknown> = isArr ? [] : {};
+      i++;
+      skip();
+      if (src[i] === close) {
+        i++;
+        return out;
+      }
+      for (;;) {
+        if (isArr) (out as unknown[]).push(value());
+        else {
+          skip();
+          if (src[i] !== '"') fail("Expected a property name");
+          const key = string();
+          skip();
+          if (src[i] !== ":") fail("Expected ':'");
+          i++;
+          // defineProperty, so a "__proto__" key is data, as with JSON.parse.
+          Object.defineProperty(out, key, { value: value(), enumerable: true, writable: true, configurable: true });
+        }
+        skip();
+        if (src[i] === ",") {
+          i++;
+          skip();
+          if (lenient && src[i] === close) {
+            i++;
+            return out;
+          }
+        } else if (src[i] === close) {
+          i++;
+          return out;
+        } else fail(`Expected ',' or '${close}'`);
+      }
+    }
+    if (c === '"') return string();
+    if (src.startsWith("true", i)) return (i += 4), true;
+    if (src.startsWith("false", i)) return (i += 5), false;
+    if (src.startsWith("null", i)) return (i += 4), null;
+    NUMBER.lastIndex = i;
+    const m = NUMBER.exec(src);
+    if (!m) return fail(i >= src.length ? "Unexpected end of input" : `Unexpected '${c}'`);
+    i += m[0].length;
+    return MAYBE_INEXACT.test(m[0]) ? new ExactNumber(m[0]) : Number(m[0]);
+  };
+  const string = (): string => {
+    const start = i;
+    i++;
+    while (i < src.length && src[i] !== '"') i += src[i] === "\\" ? 2 : 1;
+    if (i >= src.length) fail("Unterminated string");
+    i++;
+    return JSON.parse(src.slice(start, i)) as string; // handles every escape exactly like JSON.parse
+  };
+  const result = value();
+  skip();
+  if (i < src.length) fail(`Unexpected '${src[i]}'`);
+  return result;
 }
 
 export type JsonParse = { ok: true; value: unknown; lenient: boolean } | { ok: false; error: string };
 
+/** Parse JSON (or JSONC as a fallback) without changing any value. */
 export function parseJsonLenient(text: string): JsonParse {
-  const src = text.replace(/^﻿/, "");
+  const src = text.replace(/^\ufeff/, "");
   try {
-    return { ok: true, value: JSON.parse(src), lenient: false };
+    const value = JSON.parse(src);
+    return { ok: true, value: MAYBE_INEXACT.test(src) ? parseJsonExact(src, false) : value, lenient: false };
   } catch (err) {
     try {
-      return { ok: true, value: JSON.parse(stripJsonComments(src)), lenient: true };
+      return { ok: true, value: parseJsonExact(src, true), lenient: true };
     } catch {
       return { ok: false, error: (err as Error).message };
     }
@@ -58,7 +129,7 @@ export function parseJsonLines(text: string): JsonParse {
     const line = lines[i].trim();
     if (!line) continue;
     try {
-      rows.push(JSON.parse(line));
+      rows.push(MAYBE_INEXACT.test(line) ? parseJsonExact(line, false) : JSON.parse(line));
     } catch (err) {
       return { ok: false, error: `Line ${i + 1}: ${(err as Error).message}` };
     }
@@ -71,6 +142,7 @@ const MAX_CHILDREN_SHOWN = 1000;
 
 function primitive(value: unknown): HTMLElement {
   if (value === null) return el("span", { class: "j-null" }, "null");
+  if (value instanceof ExactNumber) return el("span", { class: "j-num", title: "Shown exactly as written" }, value.text);
   switch (typeof value) {
     case "string": {
       const s = el("span", { class: "j-str" }, JSON.stringify(value));
@@ -94,7 +166,7 @@ function keyLabel(key: string | number | null, inArray: boolean): HTMLElement | 
 }
 
 function node(key: string | number | null, value: unknown, depth: number, inArray: boolean): HTMLElement {
-  const isObj = value !== null && typeof value === "object";
+  const isObj = value !== null && typeof value === "object" && !(value instanceof ExactNumber);
   if (!isObj) {
     return el("div", { class: "j-row" }, keyLabel(key, inArray), primitive(value));
   }
