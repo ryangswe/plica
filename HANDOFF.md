@@ -37,7 +37,9 @@ per the Tauri docs but untested.
 
 ## Verify first (on the local machine)
 
-1. `npm install && npm test && npm run test:e2e` — should all pass.
+1. ~~`npm install && npm test && npm run test:e2e` — should all pass.~~ **Done on macOS** (2026-10-21, Apple
+   Silicon, macOS 26.6, Node 24, Rust 1.99): typecheck, unit, e2e, clippy and cargo test all pass. Clippy
+   needed one fix (an `unused_mut` that only shows up on macOS). Windows still unchecked.
 2. `npm run tauri dev` — app opens with the empty state; drag a file in; try every fixture in `tests/fixtures/`.
 3. `npm run tauri build`, then install/open the built app and check:
    - **macOS double-click flow**: set Plica as the default for `.md` (Get Info → Open with → Change All),
