@@ -24,5 +24,6 @@ Product decisions and open questions: docs/PRODUCT.md.
   e2e preview server mirrors it in `vite.config.ts`, so update both).
 - One renderer per file in `src/renderers/`, registered in `index.ts`, with a fixture in `tests/fixtures/`
   and tests in `tests/unit/` and/or `tests/e2e/`.
-- All Rust lives in `src-tauri/src/lib.rs` unless it grows past ~500 lines.
+- Rust lives in `src-tauri/src/lib.rs`, plus `encoding.rs` for decoding; split out another module when
+  `lib.rs` grows past ~500 lines.
 - Update HANDOFF.md (status + roadmap) when you finish something on it.

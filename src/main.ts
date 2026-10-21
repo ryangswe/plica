@@ -138,7 +138,10 @@ function setDoc(next: FileDoc, opts: { reloaded?: boolean; pushHistory?: boolean
   renderer = pickRenderer(next);
   nameEl.textContent = next.name;
   nameEl.title = next.path ?? next.name;
-  metaEl.textContent = `${renderer.label} · ${formatBytes(next.size)}`;
+  // Mention the encoding only when it isn't the expected UTF-8.
+  const enc = next.encoding && next.encoding !== "UTF-8" ? ` · ${encodingLabel(next.encoding)}` : "";
+  metaEl.textContent = `${renderer.label} · ${formatBytes(next.size)}${enc}`;
+  metaEl.title = next.encoding ? `Encoding: ${next.encoding}` : "";
   host.setTitle(next.name);
   if (next.path && opts.pushHistory !== false && !samePath) history.push(next.path);
   backBtn.hidden = history.length < 2;
@@ -260,6 +263,11 @@ document.addEventListener("keydown", (e) => {
     find.hide();
   }
 });
+
+/** "windows-1252" → "Windows-1252"; other names (UTF-16LE, Shift_JIS, GBK) are fine as they are. */
+function encodingLabel(name: string): string {
+  return name.replace(/^windows-/, "Windows-");
+}
 
 // ---- Boot -------------------------------------------------------------------
 

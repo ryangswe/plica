@@ -19,6 +19,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 notify = "8"
+# Text encodings (Firefox's decoder and detector): UTF-16, Windows-1252, Shift_JIS... ~215 KB.
+encoding_rs = "0.8"
+chardetng = "0.1"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"

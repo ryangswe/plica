@@ -7,6 +7,8 @@ export interface FileDoc {
   size: number;
   binary: boolean;
   truncated: boolean;
+  /** Encoding the text was decoded from ("UTF-8", "UTF-16LE", "windows-1252"...); empty for binary files. */
+  encoding: string;
 }
 
 /** What a renderer gets besides the file itself. */

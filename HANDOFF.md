@@ -25,9 +25,9 @@ Working and tested on Linux (in a headless X server):
   WebKitGTK). The installed .deb was tested end to end: opening a file through its desktop entry (what a
   file manager does on double-click) shows the file rendered. A custom desktop template
   (`src-tauri/linux/plica.desktop`) adds the `%F` the default template was missing.
-- Tests: 23 unit tests (vitest + jsdom), 16 browser e2e tests run in both Chromium and WebKit (Playwright
+- Tests: 29 unit tests (vitest + jsdom), 17 browser e2e tests run in both Chromium and WebKit (Playwright
   against `vite preview`, which sends the same CSP as the app, and the tests fail on any CSP violation;
-  screenshots in `test-results/screens/<browser>/`), 5 Rust unit tests. Note: locally, Playwright reuses
+  screenshots in `test-results/screens/<browser>/`), 10 Rust unit tests, and `tests/macos/smoke.sh`. Note: locally, Playwright reuses
   whatever is on port 1420, so stop `tauri dev` before `npm run test:e2e` or it tests the dev server
   without the CSP.
 - CI (`.github/workflows/ci.yml`): typecheck, unit, e2e, clippy + cargo test. Pushes check Linux only (private-repo
@@ -82,10 +82,11 @@ src/                     web frontend (TypeScript, no framework, Vite)
   types.ts               FileDoc, Renderer, RenderContext
   renderers/             one file per type + index.ts registry (first match wins, codeRenderer is fallback)
     raw.ts               line-numbered highlighted source (used for every Raw view)
-  lib/                   highlight (highlight.js), sanitize (DOMPurify), ansi, paths, dom helpers
+  lib/                   highlight (highlight.js), sanitize (DOMPurify), ansi, paths, decode, dom helpers
   styles.css             all styling; CSS variables for light/dark
 src-tauri/
-  src/lib.rs             windows, file reading, watching, OS open events (all Rust code is here)
+  src/lib.rs             windows, file reading, watching, OS open events, macOS tabs
+  src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
   tauri.conf.json        CSP, asset protocol, file associations, bundle settings
   capabilities/          permissions granted to windows (labels w0, w1, ...)
 tests/
@@ -98,7 +99,7 @@ tests/
 Flow: Rust creates a window per file and stores the path as "pending". The frontend registers listeners,
 then calls `take_initial_file`. Files opened later (macOS Opened event, second launch) either reuse an empty
 window (`open-path` event) or create a new one. `read_file` returns `{path, name, text, size, binary,
-truncated}` (64 MB cap, NUL byte = binary). `watch_file` watches the parent dir and emits `file-changed`
+truncated, encoding}` (64 MB cap, NUL byte = binary). `watch_file` watches the parent dir and emits `file-changed`
 to that window only; the frontend debounces and re-reads.
 
 Adding a renderer: create `src/renderers/foo.ts` exporting a `Renderer` (`id`, `label`, `extensions`,
@@ -117,8 +118,11 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
 2. **Export**: "Export as HTML" (rendered content + inlined CSS), "Print / Save as PDF" (check
    `window.print()` support in each webview), optional DOCX via `pandoc` when it's installed. This was part
    of the original idea (HTML/DOCX/PDF renderers for Markdown).
-3. **Text encoding**: detect UTF-16 (BOM) and legacy encodings (`encoding_rs` + `chardetng`) in
-   `read_file_data`; Excel CSVs on Windows are often UTF-16/Windows-1252 and currently show garbled.
+3. ~~**Text encoding**~~ **Done 2026-10-21**: `src-tauri/src/encoding.rs` decodes by BOM, then UTF-16 by its
+   zero bytes (previously shown as "binary"), then UTF-8, then a `chardetng` guess (Windows-1252,
+   Shift_JIS, GBK...). +215 KB. The top bar names the encoding when it isn't UTF-8. The browser host
+   mirrors it in `src/lib/decode.ts` with Windows-1252 as its only legacy fallback. Fixtures:
+   `excel-utf16.csv`, `excel-1252.csv`.
 4. ~~**macOS native tabs**~~ **Done 2026-10-21**: `.tabbing_identifier("plica")` in `create_window`
    (macOS only). Tauri's default menu registers its Window menu with AppKit, so Show Tab Bar / Merge All
    Windows / Move Tab to New Window appear there; "Prefer tabs: Always" opens files as tabs, and reopening

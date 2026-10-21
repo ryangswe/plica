@@ -1,3 +1,4 @@
+import { decodeBytes } from "./lib/decode";
 import type { FileDoc } from "./types";
 
 /**
@@ -29,6 +30,7 @@ interface RawFile {
   size: number;
   binary: boolean;
   truncated: boolean;
+  encoding: string;
 }
 
 export function isTauri(): boolean {
@@ -36,10 +38,16 @@ export function isTauri(): boolean {
 }
 
 async function fileToDoc(file: File): Promise<FileDoc> {
-  const buf = new Uint8Array(await file.arrayBuffer());
-  const binary = buf.subarray(0, 8000).includes(0);
-  const text = binary ? "" : new TextDecoder("utf-8").decode(buf).replace(/^﻿/, "");
-  return { path: null, name: file.name, text, size: file.size, binary, truncated: false };
+  const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()));
+  return {
+    path: null,
+    name: file.name,
+    text: decoded?.text ?? "",
+    size: file.size,
+    binary: !decoded,
+    truncated: false,
+    encoding: decoded?.encoding ?? "",
+  };
 }
 
 export function createBrowserHost(): Host {

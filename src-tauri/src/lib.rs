@@ -17,6 +17,9 @@ use std::{
     },
 };
 
+mod encoding;
+
+use encoding::decode_text;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, EventTarget, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -49,6 +52,8 @@ struct FileData {
     size: u64,
     binary: bool,
     truncated: bool,
+    /// Encoding the text was decoded from, e.g. "UTF-8", "UTF-16LE", "windows-1252".
+    encoding: String,
 }
 
 fn read_file_data(path: &Path) -> Result<FileData, String> {
@@ -60,13 +65,9 @@ fn read_file_data(path: &Path) -> Result<FileData, String> {
     File::open(path)
         .and_then(|f| f.take(MAX_BYTES).read_to_end(&mut bytes))
         .map_err(|e| format!("{}: {e}", path.display()))?;
-    let binary = bytes[..bytes.len().min(8000)].contains(&0);
-    let text = if binary {
-        String::new()
-    } else {
-        let s = String::from_utf8_lossy(&bytes);
-        s.strip_prefix('\u{feff}').unwrap_or(&s).to_string()
-    };
+    let decoded = decode_text(&bytes);
+    let binary = decoded.is_none();
+    let (text, encoding) = decoded.map_or((String::new(), ""), |(t, e)| (t, e.name()));
     Ok(FileData {
         path: path.to_string_lossy().into_owned(),
         name: path
@@ -77,6 +78,7 @@ fn read_file_data(path: &Path) -> Result<FileData, String> {
         size: meta.len(),
         binary,
         truncated: meta.len() > MAX_BYTES,
+        encoding: encoding.to_string(),
     })
 }
 

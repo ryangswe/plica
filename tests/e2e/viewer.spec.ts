@@ -91,6 +91,24 @@ test("csv: sort and filter", async ({ page }) => {
   await expect(page.getByText("2 of 6 rows")).toBeVisible();
 });
 
+test("csv exported by Excel in UTF-16 or Windows-1252 reads correctly", async ({ page }) => {
+  await open(page, "excel-utf16.csv");
+  await expect(page.locator("tbody tr")).toHaveCount(3);
+  await expect(page.locator("tbody")).toContainText("Café & naïve – ok");
+  await expect(page.locator("tbody")).toContainText("日本語");
+  await expect(page.locator(".file-meta")).toContainText("UTF-16LE");
+
+  await open(page, "excel-1252.csv");
+  await expect(page.locator("thead")).toContainText("City"); // ";" delimiter detected
+  await expect(page.locator("tbody")).toContainText("Café Müller");
+  await expect(page.locator("tbody")).toContainText("“Smart” quotes");
+  await expect(page.locator(".file-meta")).toContainText("Windows-1252");
+  await page.screenshot({ path: `${SHOTS}/14-csv-1252.png` });
+
+  await open(page, "data.csv"); // plain UTF-8: no encoding shown
+  await expect(page.locator(".file-meta")).not.toContainText("UTF");
+});
+
 test("notebook renders cells and outputs", async ({ page }) => {
   await open(page, "notebook.ipynb");
   await expect(page.locator(".nb-md h1")).toHaveText(/Notebook demo/);
