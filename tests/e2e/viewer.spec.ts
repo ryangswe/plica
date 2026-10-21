@@ -51,6 +51,26 @@ test("markdown: preview, toggle to raw with button and keyboard", async ({ page 
   await expect(page.locator(".raw")).toBeVisible();
 });
 
+test("code blocks have a copy button that copies the code as written", async ({ page }) => {
+  await open(page, "sample.md");
+  await page.evaluate(() => {
+    const w = window as unknown as { __copied: string[] };
+    w.__copied = [];
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => void w.__copied.push(t) }, configurable: true });
+  });
+  const block = page.locator(".markdown-body .code-block").first();
+  const button = block.locator(".copy-code");
+  await expect(button).toHaveCSS("opacity", "0"); // hidden until hover
+  await block.hover();
+  await expect(button).toHaveCSS("opacity", "1");
+  await page.screenshot({ path: `${SHOTS}/15-copy-code.png`, clip: (await block.boundingBox())! });
+  await button.click();
+  await expect(button).toHaveClass(/copied/);
+  const copied = await page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
+  expect(copied).toEqual(['def greet(name: str) -> str:\n    """Say hello."""\n    return f"Hello, {name}!"']);
+  await expect(page.locator(".markdown-body blockquote .copy-code")).toHaveCount(0);
+});
+
 test("markdown: in-page anchor links scroll instead of navigating", async ({ page }) => {
   await open(page, "sample.md");
   await page.locator(".markdown-body a", { hasText: "jump to the table" }).click();

@@ -5,6 +5,7 @@ import { ansiToHtml } from "../lib/ansi";
 import type { RenderContext, Renderer } from "../types";
 import { renderMarkdownInto } from "./markdown";
 import { parseErrorView } from "./json";
+import { addCopyButtons } from "../lib/copy";
 
 type Multiline = string | string[];
 interface Output {
@@ -107,6 +108,7 @@ export const notebookRenderer: Renderer = {
         el("div", { class: "nb-prompt" }, `[${n ?? " "}]:`),
         el("div", { class: "nb-body" }, code),
       );
+      addCopyButtons(cellEl, "pre.nb-code");
       const outputs = el("div", { class: "nb-outputs" });
       for (const out of cell.outputs ?? []) {
         const o = await renderOutput(out, ctx);

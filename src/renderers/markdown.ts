@@ -6,6 +6,7 @@ import { el, escapeHtml } from "../lib/dom";
 import { hasScheme } from "../lib/paths";
 import type { RenderContext, Renderer } from "../types";
 import { renderMermaidBlocks } from "./mermaid";
+import { addCopyButtons } from "../lib/copy";
 
 function slugify(text: string): string {
   return text
@@ -117,6 +118,7 @@ export async function renderMarkdownInto(md: string, ctx: RenderContext): Promis
   applyAlerts(container);
   fixAssets(container, ctx);
   await renderMermaidBlocks(container, ctx.dark);
+  addCopyButtons(container, "pre");
   return container;
 }
 

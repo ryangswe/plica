@@ -375,6 +375,30 @@ button.primary:hover { filter: brightness(1.08); background: var(--accent); }
   background: var(--bg-soft);
   border: 1px solid var(--border-soft);
 }
+/* Copy button on code blocks: appears on hover or keyboard focus. */
+.code-block { position: relative; }
+.copy-code {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.code-block:hover .copy-code, .copy-code:focus-visible, .copy-code.copied { opacity: 1; }
+.copy-code:hover { color: var(--fg); }
+.copy-code.copied { color: var(--add-fg); }
+.copy-code svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+@media (hover: none) { .copy-code { opacity: 1; } }
 .markdown-body pre code { padding: 0; background: transparent; font-size: inherit; border-radius: 0; }
 .markdown-body table { border-collapse: collapse; display: block; overflow: auto; max-width: 100%; }
 .markdown-body th, .markdown-body td { padding: 6px 13px; border: 1px solid var(--border); }

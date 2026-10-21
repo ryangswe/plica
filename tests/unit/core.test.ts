@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { markdownToHtml, splitFrontmatter, markdownRenderer } from "../../src/renderers/markdown";
+import { markdownToHtml, splitFrontmatter, markdownRenderer, renderMarkdownInto } from "../../src/renderers/markdown";
 import { parseJsonLenient, parseJsonLines, jsonRenderer } from "../../src/renderers/json";
 import { parseDelimited, csvRenderer } from "../../src/renderers/csv";
 import { parseUnifiedDiff } from "../../src/renderers/diff";
@@ -266,5 +266,19 @@ describe("reload", () => {
     expect(staleMessage(r.ok ? "" : r.error)).toMatch(/^This file was moved or deleted\. You're seeing the last version/);
     expect(staleMessage("Permission denied (os error 13)")).toMatch(/isn't allowed/);
     expect(staleMessage("weird")).toMatch(/can't read this file right now/);
+  });
+});
+
+describe("copy buttons", () => {
+  it("adds one to each code block and copies the code exactly", async () => {
+    const body = await renderMarkdownInto("Text\n\n```sh\nnpm install plica\nnpm test\n```\n\n> a quote\n", ctx());
+    const buttons = body.querySelectorAll(".code-block > .copy-code");
+    expect(buttons.length).toBe(1); // code block yes, quote no
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => void copied.push(t) }, configurable: true });
+    (buttons[0] as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(copied).toEqual(["npm install plica\nnpm test"]);
+    expect(buttons[0].classList.contains("copied")).toBe(true);
   });
 });
