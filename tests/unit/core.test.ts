@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { markdownToHtml, splitFrontmatter, markdownRenderer, renderMarkdownInto } from "../../src/renderers/markdown";
-import { parseJsonLenient, parseJsonLines, jsonRenderer } from "../../src/renderers/json";
+import { parseJsonLenient, parseJsonLines, jsonRenderer, jsonText } from "../../src/renderers/json";
 import { parseDelimited, csvRenderer } from "../../src/renderers/csv";
 import { parseUnifiedDiff } from "../../src/renderers/diff";
 import { detectLevel, logRenderer } from "../../src/renderers/log";
@@ -190,7 +190,9 @@ describe("logs", () => {
     const rows = out.querySelectorAll(".ln");
     expect(rows[5].className).toContain("lv-error"); // "    at com.example..."
     expect(out.querySelector(".ansi-fg-2")).not.toBeNull();
-    expect(out.querySelector(".chip-error")?.textContent).toMatch(/error 4/);
+    expect(out.querySelector(".chip-error")?.textContent).toMatch(/error 1/);
+    // The chip counts entries (a stack trace is one error) and says how many lines that covers.
+    expect(out.querySelector(".chip-error")?.getAttribute("title")).toMatch(/^1 error entry \(4 lines\)/);
   });
 });
 
@@ -381,5 +383,42 @@ describe("default apps", () => {
     expect(sheet.textContent).toContain("Settings → Apps → Default apps");
     expect(sheet.querySelectorAll("input").length).toBe(0);
     sheet.remove();
+  });
+});
+
+describe("polish", () => {
+  it("copies JSON values exactly: subtrees as JSON, bare strings without quotes", () => {
+    const r = parseJsonLenient('{"id":9007199254740993,"tags":["a","b"],"empty":{}}');
+    const v = (r.ok ? r.value : {}) as Record<string, unknown>;
+    expect(jsonText(v.id)).toBe("9007199254740993");
+    expect(jsonText(v.tags)).toBe('[\n  "a",\n  "b"\n]');
+    expect(jsonText("hello")).toBe("hello");
+    expect(jsonText(v)).toContain('"id": 9007199254740993');
+    expect(jsonText(v.empty)).toBe("{}");
+  });
+
+  it("tells screen readers whether JSON nodes are expanded, and offers Copy per row", () => {
+    const out = jsonRenderer.render!(doc("package.json"), ctx()) as HTMLElement;
+    const toggle = out.querySelector<HTMLButtonElement>(".j-node:not(.open) .j-toggle")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    toggle.click();
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(out.querySelectorAll(".j-copy").length).toBeGreaterThan(5);
+  });
+
+  it("sorts CSV columns from the keyboard and announces the order", () => {
+    const out = csvRenderer.render!(doc("data.csv"), ctx()) as HTMLElement;
+    const th = out.querySelectorAll<HTMLElement>("th[data-col]")[3];
+    expect(th.getAttribute("aria-sort")).toBe("none");
+    const btn = th.querySelector<HTMLButtonElement>("button.th-sort")!;
+    btn.click(); // Enter/Space on a focused button fire click
+    expect(th.getAttribute("aria-sort")).toBe("ascending");
+    btn.click();
+    expect(th.getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("says the notebook kernel is the saved one, not a running one", async () => {
+    const out = (await notebookRenderer.render!(doc("notebook.ipynb"), ctx())) as HTMLElement;
+    expect(out.querySelector(".nb-kernel")?.textContent).toBe("Saved kernel: Python 3");
   });
 });

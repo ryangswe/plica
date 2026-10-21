@@ -71,7 +71,9 @@ function makeTableRenderer(id: string, label: string, extensions: string[], deli
       const headRow = el("tr", {}, el("th", { class: "rownum" }, "#"));
       for (let c = 0; c < width; c++) {
         // Columns past the header's end still show (rows with extra fields); label them by number.
-        const th = el("th", { "data-col": String(c), title: "Click to sort" }, header[c] ?? `Column ${c + 1}`);
+        // A button inside the header cell makes sorting reachable from the keyboard; aria-sort says the state.
+        const sortBtn = el("button", { class: "th-sort", type: "button", title: "Sort by this column" }, header[c] ?? `Column ${c + 1}`);
+        const th = el("th", { "data-col": String(c), "aria-sort": "none" }, sortBtn);
         if (c >= header.length) th.classList.add("extra-col");
         th.addEventListener("click", () => {
           if (state.sortCol === c) state.sortDir = state.sortDir === 1 ? -1 : 1;
@@ -106,6 +108,8 @@ function makeTableRenderer(id: string, label: string, extensions: string[], deli
         for (const th of thead.querySelectorAll<HTMLElement>("th[data-col]")) {
           th.classList.toggle("sorted-asc", Number(th.dataset.col) === state.sortCol && state.sortDir === 1);
           th.classList.toggle("sorted-desc", Number(th.dataset.col) === state.sortCol && state.sortDir === -1);
+          const sorted = Number(th.dataset.col) === state.sortCol;
+          th.setAttribute("aria-sort", sorted ? (state.sortDir === -1 ? "descending" : "ascending") : "none");
         }
         const frag = document.createDocumentFragment();
         for (const { r, i } of view.slice(0, limit)) {

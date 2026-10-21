@@ -20,6 +20,8 @@ src-tauri/
   src/lib.rs             windows, file reading, watching, OS open events, macOS tabs
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
   src/defaults.rs        which app opens each file type; make Plica the default (macOS: NSWorkspace + UTType)
+  src/chrome.rs          macOS: tells each window when the tab bar shows or it goes full screen (the toolbar
+                         is drawn in the transparent title bar)
   src/settings.rs        settings.json (editor, recent files, remote images, prompts)
   src/menu.rs            macOS menu bar, Open Recent (AppKit-managed), Open in Editor; commands the
                          frontend owns are sent to the focused window as `menu` events

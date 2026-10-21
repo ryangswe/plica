@@ -73,6 +73,14 @@ pub fn decode_text(bytes: &[u8]) -> Option<(String, &'static Encoding)> {
     Some((text.into_owned(), encoding))
 }
 
+/// Decode with an encoding the user picked ("Reopen with Encoding"), by WHATWG label ("windows-1251",
+/// "shift_jis"...). A byte-order mark is dropped only if it matches. `None` for an unknown label.
+pub fn decode_as(bytes: &[u8], label: &str) -> Option<(String, &'static Encoding)> {
+    let encoding = Encoding::for_label(label.as_bytes())?;
+    let (text, _) = encoding.decode_with_bom_removal(bytes);
+    Some((text.into_owned(), encoding))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +149,14 @@ mod tests {
         let jp = "日本語のテキストファイルです。文字化けしないで表示されるべきです。";
         let (bytes, _, _) = encoding_rs::SHIFT_JIS.encode(jp);
         assert_eq!(decoded(&bytes), (jp.to_string(), "Shift_JIS"));
+    }
+
+    #[test]
+    fn reopen_with_a_chosen_encoding() {
+        let (bytes, _, _) = encoding_rs::WINDOWS_1251.encode("Привет");
+        assert_eq!(decode_as(&bytes, "windows-1251").map(|(t, e)| (t, e.name())), Some(("Привет".to_string(), "windows-1251")));
+        assert_eq!(decode_as("\u{feff}hi".as_bytes(), "utf-8").map(|(t, _)| t), Some("hi".to_string()));
+        assert!(decode_as(b"x", "not-an-encoding").is_none());
     }
 
     #[test]

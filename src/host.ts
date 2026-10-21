@@ -21,6 +21,8 @@ export interface Host {
     notice(msg: string): void;
     /** The "load remote images automatically" preference changed (menu, another window). */
     remoteContent(allowed: boolean): void;
+    /** macOS window chrome changed: tab bar shown (its inset in px, else 0) or full screen. */
+    chrome(state: { tabBarInset: number; fullscreen: boolean }): void;
   }): Promise<void>;
   /** True when a native menu bar owns the standard shortcuts (Cmd+O, Cmd+F, Cmd+/...). */
   nativeMenu: boolean;
@@ -36,7 +38,8 @@ export interface Host {
   takePendingCommand(): Promise<string | null>;
   pickFile(): Promise<FileDoc | null>;
   canReadPaths: boolean;
-  readPath(path: string): Promise<FileDoc>;
+  /** Read a file; `encoding` (a WHATWG label) overrides detection ("Reopen with Encoding"). */
+  readPath(path: string, encoding?: string): Promise<FileDoc>;
   /** Call `onChange` when the file at `path` changes on disk. Replaces any previous watch. */
   watch(path: string, onChange: () => void): void;
   assetUrl(path: string): string | null;
@@ -177,7 +180,9 @@ export async function createTauriHost(): Promise<Host> {
     kind: "tauri",
     canReadPaths: true,
     nativeMenu: /Mac/.test(navigator.platform),
-    async init({ openPath, error, dragging, command, notice, remoteContent }) {
+    async init({ openPath, error, dragging, command, notice, remoteContent, chrome }) {
+      await win.listen<{ tabBarInset: number; fullscreen: boolean }>("window-chrome", (e) => chrome(e.payload));
+      invoke("resend_window_chrome").catch(() => {}); // macOS only; the first report may predate us
       await win.listen<string>("open-path", (e) => openPath(e.payload));
       await listen<boolean>("remote-content", (e) => remoteContent(e.payload)); // app-wide broadcast
       await win.listen<string>("menu", (e) => command(e.payload));
@@ -202,8 +207,8 @@ export async function createTauriHost(): Promise<Host> {
       if (typeof picked !== "string") return null;
       return toDoc(await invoke<RawFile>("read_file", { path: picked }));
     },
-    async readPath(path) {
-      return toDoc(await invoke<RawFile>("read_file", { path }));
+    async readPath(path, encoding) {
+      return toDoc(await invoke<RawFile>("read_file", { path, encoding: encoding ?? null }));
     },
     watch(path, onChange) {
       changeHandler = onChange;

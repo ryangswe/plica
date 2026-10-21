@@ -1,7 +1,8 @@
 import "./styles.css";
+import appIconUrl from "../src-tauri/icons/icon.svg?url"; // the app icon, also on the start screen
 import type { FileDoc, RenderContext, Renderer } from "./types";
 import { createBrowserHost, createTauriHost, isTauri, type Host } from "./host";
-import { pickRenderer, rawLanguageFor, renderers } from "./renderers";
+import { pickRenderer, rawLanguageFor } from "./renderers";
 import { renderRaw } from "./renderers/raw";
 import { el, formatBytes } from "./lib/dom";
 import { hasScheme, resolveRelative, splitFragment } from "./lib/paths";
@@ -26,15 +27,17 @@ const rawBtn = el("button", { "data-mode": "raw", role: "tab" }, "Raw");
 const modeSwitch = el("div", { class: "mode-switch", role: "tablist", title: `Toggle Preview / Raw (${MOD}/)`, hidden: "" }, previewBtn, rawBtn);
 const copyBtn = el("button", { class: "ghost", title: "Copy the whole file as plain text", hidden: "" }, "Copy source");
 const openBtn = el("button", { class: "ghost", title: `Open a file (${MOD}O)` }, "Open…");
+// Toolbar: file name on the left, Preview | Raw centered, actions on the right. On macOS it is also the
+// title bar: everything that isn't a control drags the window (and double-click zooms).
+const drag = { "data-tauri-drag-region": "" };
+nameEl.setAttribute("data-tauri-drag-region", "");
+metaEl.setAttribute("data-tauri-drag-region", "");
 const bar = el(
   "header",
-  { class: "topbar" },
-  backBtn,
-  el("div", { class: "file-title" }, nameEl, metaEl),
-  el("div", { class: "spacer" }),
-  modeSwitch,
-  copyBtn,
-  openBtn,
+  { class: "topbar", ...drag },
+  el("div", { class: "tb-left", ...drag }, backBtn, el("div", { class: "file-title", ...drag }, nameEl, metaEl)),
+  el("div", { class: "tb-center", ...drag }, modeSwitch),
+  el("div", { class: "tb-right", ...drag }, copyBtn, openBtn),
 );
 // Shown while the open file can't be read anymore (deleted, moved, permissions); the last content stays.
 const staleBar = el("div", { class: "stale-bar", role: "alert", hidden: "" });
@@ -72,17 +75,16 @@ function showToast(msg: string, ms = 1600) {
 }
 
 function emptyState(): HTMLElement {
-  const types = renderers.map((r) => r.label).join(" · ");
   const openLink = el("button", { class: "primary" }, "Open a file");
   openLink.addEventListener("click", () => void pick());
   return el(
     "div",
     { class: "empty" },
-    el("div", { class: "empty-mark", "aria-hidden": "true" }, "❯_"),
+    el("img", { class: "empty-mark", src: appIconUrl, alt: "", width: "72", height: "72" }),
     el("h1", {}, "Plica"),
-    el("p", {}, "Drop a file here, or"),
+    el("p", {}, "Read Markdown and developer files. Drop one here, or"),
     openLink,
-    el("p", { class: "muted small" }, types, " · and any text or code file"),
+    el("p", { class: "muted small" }, "Markdown, JSON, CSV, notebooks, logs, diffs, Mermaid and any text or code file."),
     el(
       "div",
       { class: "shortcuts muted small" },
@@ -242,10 +244,14 @@ function setDoc(next: FileDoc, opts: { reloaded?: boolean; pushHistory?: boolean
   renderer = pickRenderer(next);
   nameEl.textContent = next.name;
   nameEl.title = next.path ?? next.name;
-  // Mention the encoding only when it isn't the expected UTF-8.
-  const enc = next.encoding && next.encoding !== "UTF-8" ? ` · ${encodingLabel(next.encoding)}` : "";
-  metaEl.textContent = `${renderer.label} · ${formatBytes(next.size)}${enc}`;
+  // Mention the encoding only when it isn't the expected UTF-8 (or the user picked one), and let the
+  // user correct a wrong guess right there.
+  metaEl.replaceChildren(`${renderer.label} · ${formatBytes(next.size)}`);
   metaEl.title = next.encoding ? `Encoding: ${next.encoding}` : "";
+  const overridden = next.path != null && encodingOverride.has(next.path);
+  if (next.encoding && (next.encoding !== "UTF-8" || overridden)) {
+    metaEl.append(" · ", next.path && host.canReadPaths ? encodingPicker(next.encoding) : encodingLabel(next.encoding));
+  }
   host.setTitle(next.name);
   if (next.path && opts.pushHistory !== false && !samePath) history.push(next.path);
   backBtn.hidden = history.length < 2;
@@ -263,7 +269,7 @@ function scrollToAnchor(id: string | null): boolean {
 
 async function openPath(path: string, opts: { pushHistory?: boolean; anchor?: string | null } = {}) {
   try {
-    const next = await host.readPath(path);
+    const next = await host.readPath(path, encodingOverride.get(path));
     pendingAnchor = opts.anchor ?? null;
     setDoc(next, opts);
   } catch (err) {
@@ -277,7 +283,7 @@ function onFileChanged() {
   reloadTimer = window.setTimeout(async () => {
     if (!doc?.path) return;
     const path = doc.path;
-    const r = await readWithRetry(() => host.readPath(path));
+    const r = await readWithRetry(() => host.readPath(path, encodingOverride.get(path)));
     if (doc?.path !== path) return; // switched files meanwhile
     if (!r.ok) {
       staleBar.textContent = staleMessage(r.error);
@@ -329,8 +335,19 @@ async function copyText(text: string, done: string) {
 }
 copyBtn.addEventListener("click", () => doc && void copyText(doc.text, "Copied source"));
 
+/** "Reopen with Encoding" choices per file, for this window (kept across live reloads). */
+const encodingOverride = new Map<string, string>();
+
+function reopenWithEncoding(label: string) {
+  if (!doc?.path) return showToast("Reopening with another encoding works for files on disk.");
+  if (label === "auto") encodingOverride.delete(doc.path);
+  else encodingOverride.set(doc.path, label);
+  void openPath(doc.path, { pushHistory: false });
+}
+
 /** Commands from the native menu bar (macOS). */
 function runCommand(id: string) {
+  if (id.startsWith("encoding:")) return reopenWithEncoding(id.slice("encoding:".length));
   if (id === "toggle-raw") setMode(mode === "raw" ? "rendered" : "raw");
   else if (id === "reload" && doc?.path) void openPath(doc.path, { pushHistory: false });
   else if (id === "back") goBack();
@@ -401,6 +418,30 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+/** Encodings to offer in the top bar (same list as the macOS menu). [WHATWG label, name] */
+const ENCODINGS: [string, string][] = [
+  ["utf-8", "UTF-8"], ["utf-16le", "UTF-16LE"], ["utf-16be", "UTF-16BE"], ["windows-1252", "Windows-1252"],
+  ["windows-1250", "Windows-1250"], ["windows-1251", "Windows-1251"], ["koi8-r", "KOI8-R"], ["windows-1253", "Windows-1253"],
+  ["windows-1254", "Windows-1254"], ["windows-1255", "Windows-1255"], ["windows-1256", "Windows-1256"],
+  ["shift_jis", "Shift_JIS"], ["euc-jp", "EUC-JP"], ["gbk", "GBK"], ["big5", "Big5"], ["euc-kr", "EUC-KR"],
+];
+
+/** The encoding name as a small native picker: choosing another one reopens the file with it. */
+function encodingPicker(current: string): HTMLElement {
+  const select = el("select", { class: "encoding-picker", "aria-label": "Text encoding", title: "Reopen with another encoding" }) as HTMLSelectElement;
+  const known = ENCODINGS.some(([, name]) => name.toLowerCase() === current.toLowerCase());
+  if (!known) select.append(el("option", { value: "" }, encodingLabel(current)));
+  for (const [label, name] of ENCODINGS) {
+    const o = el("option", { value: label }, name);
+    if (name.toLowerCase() === current.toLowerCase()) o.selected = true;
+    select.append(o);
+  }
+  select.append(el("option", { value: "auto" }, "Detect automatically"));
+  select.addEventListener("change", () => select.value && reopenWithEncoding(select.value));
+  // Looks like the plain label; the (invisible) native picker on top of it opens the system menu.
+  return el("span", { class: "encoding-pick" }, el("span", { class: "encoding-name" }, encodingLabel(current), " ▾"), select);
+}
+
 /** "windows-1252" → "Windows-1252"; other names (UTF-16LE, Shift_JIS, GBK) are fine as they are. */
 function encodingLabel(name: string): string {
   return name.replace(/^windows-/, "Windows-");
@@ -413,6 +454,8 @@ async function boot() {
   allowRemote = await host.getRemoteContent();
   document.documentElement.dataset.host = host.kind;
   document.documentElement.dataset.platform = isMac ? "mac" : "other";
+  // On macOS the menu bar has File → Open; keep the toolbar for the file itself.
+  openBtn.hidden = host.nativeMenu;
   void render();
   await host.init({
     open: (d) => setDoc(d),
@@ -421,6 +464,13 @@ async function boot() {
     dragging: (on) => (dropOverlay.hidden = !on),
     command: runCommand,
     notice: (m) => showToast(m, 2500),
+    chrome: ({ tabBarInset, fullscreen }) => {
+      // macOS tab bar shown: move the toolbar below it. Full screen: no traffic lights to make room for.
+      const root = document.documentElement;
+      root.style.setProperty("--tabbar-inset", `${tabBarInset}px`);
+      root.dataset.tabbar = tabBarInset > 0 ? "1" : "";
+      root.dataset.fullscreen = fullscreen ? "1" : "";
+    },
     remoteContent: (allowed) => {
       allowRemote = allowed;
       void render({ keepScroll: true });

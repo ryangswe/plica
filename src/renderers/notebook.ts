@@ -84,7 +84,7 @@ export const notebookRenderer: Renderer = {
     const lang = nb.metadata?.language_info?.name ?? nb.metadata?.kernelspec?.language ?? "python";
     const root = el("div", { class: "notebook" });
     const kernel = nb.metadata?.kernelspec?.display_name;
-    if (kernel) root.append(el("div", { class: "muted nb-kernel" }, `Kernel: ${kernel}`));
+    if (kernel) root.append(el("div", { class: "muted nb-kernel" }, `Saved kernel: ${kernel}`));
     if (!nb.cells) {
       root.append(el("div", { class: "notice" }, "This notebook uses an old format (nbformat < 4) that isn't supported yet. Use Raw."));
       return root;

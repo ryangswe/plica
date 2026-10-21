@@ -27,6 +27,8 @@ test.afterEach(() => {
 test("empty state", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Plica" })).toBeVisible();
   await expect(page.locator(".mode-switch")).toBeHidden();
+  // The start screen shows the app icon (and it loads under the app's CSP).
+  await expect.poll(() => page.locator("img.empty-mark").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await page.screenshot({ path: `${SHOTS}/00-empty.png` });
 });
 

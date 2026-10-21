@@ -158,6 +158,36 @@ function primitive(value: unknown): HTMLElement {
   }
 }
 
+/** A value as JSON text for the clipboard: exact numbers as written; a bare string without quotes. */
+export function jsonText(value: unknown, top = true): string {
+  if (top && typeof value === "string") return value;
+  const walk = (v: unknown, indent: string): string => {
+    if (v instanceof ExactNumber) return v.text;
+    if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+    const inner = indent + "  ";
+    if (Array.isArray(v)) return v.length ? `[\n${v.map((x) => inner + walk(x, inner)).join(",\n")}\n${indent}]` : "[]";
+    const entries = Object.entries(v as Record<string, unknown>);
+    return entries.length ? `{\n${entries.map(([k, x]) => `${inner}${JSON.stringify(k)}: ${walk(x, inner)}`).join(",\n")}\n${indent}}` : "{}";
+  };
+  return walk(value, "");
+}
+
+/** Small "Copy" button for a row (shown on hover/focus), copying that value. */
+function copyButton(value: unknown): HTMLElement {
+  const b = el("button", { class: "j-copy", type: "button", title: "Copy this value as JSON" }, "Copy");
+  b.addEventListener("click", async (e) => {
+    e.stopPropagation(); // don't toggle the node
+    try {
+      await navigator.clipboard.writeText(jsonText(value));
+      b.textContent = "Copied";
+    } catch {
+      b.textContent = "Couldn't copy";
+    }
+    window.setTimeout(() => (b.textContent = "Copy"), 1200);
+  });
+  return b;
+}
+
 function keyLabel(key: string | number | null, inArray: boolean): HTMLElement | null {
   if (key === null) return null;
   return inArray
@@ -168,7 +198,7 @@ function keyLabel(key: string | number | null, inArray: boolean): HTMLElement | 
 function node(key: string | number | null, value: unknown, depth: number, inArray: boolean): HTMLElement {
   const isObj = value !== null && typeof value === "object" && !(value instanceof ExactNumber);
   if (!isObj) {
-    return el("div", { class: "j-row" }, keyLabel(key, inArray), primitive(value));
+    return el("div", { class: "j-row" }, keyLabel(key, inArray), primitive(value), copyButton(value));
   }
   const isArr = Array.isArray(value);
   const entries: [string | number, unknown][] = isArr
@@ -179,7 +209,7 @@ function node(key: string | number | null, value: unknown, depth: number, inArra
     return el("div", { class: "j-row" }, keyLabel(key, inArray), el("span", { class: "j-brace" }, openB + closeB));
   }
   const summary = `${entries.length} ${isArr ? (entries.length === 1 ? "item" : "items") : entries.length === 1 ? "key" : "keys"}`;
-  const toggle = el("button", { class: "j-toggle", "aria-label": "Toggle" });
+  const toggle = el("button", { class: "j-toggle", "aria-label": key === null ? "Root" : String(key), "aria-expanded": "false" });
   const head = el(
     "div",
     { class: "j-row j-head" },
@@ -188,6 +218,7 @@ function node(key: string | number | null, value: unknown, depth: number, inArra
     el("span", { class: "j-brace" }, openB),
     el("span", { class: "j-summary" }, ` ${summary} `),
     el("span", { class: "j-brace j-close-inline" }, closeB),
+    copyButton(value),
   );
   const children = el("div", { class: "j-children" });
   const wrap = el("div", { class: "j-node" }, head, children, el("div", { class: "j-row j-close" }, el("span", { class: "j-brace" }, closeB)));
@@ -204,6 +235,7 @@ function node(key: string | number | null, value: unknown, depth: number, inArra
   const setOpen = (open: boolean) => {
     if (open) build();
     wrap.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
   };
   head.addEventListener("click", () => setOpen(!wrap.classList.contains("open")));
   (wrap as unknown as { setOpen: (o: boolean) => void }).setOpen = setOpen;

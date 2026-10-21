@@ -59,6 +59,8 @@ On macOS everything is also in the menu bar, plus:
 | <kbd>Cmd</kbd> <kbd>1</kbd>…<kbd>9</kbd>, <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Switch tabs (Window → Merge All Windows to put windows in tabs) |
 | <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>M</kbd> | Merge All Windows |
 
+If a file's characters look wrong, click its encoding in the top bar (or File → Reopen with Encoding) to pick another.
+
 ## Install
 
 Download the installer for your OS from the [Releases](../../releases) page.

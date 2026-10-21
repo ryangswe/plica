@@ -25,6 +25,26 @@ use tauri_plugin_dialog::DialogExt;
 const FRONTEND_COMMANDS: &[&str] =
     &["toggle-raw", "reload", "back", "copy-source", "copy-path", "find", "find-next", "find-prev", "default-apps"];
 
+/// Encodings offered in File → Reopen with Encoding: (WHATWG label, menu text).
+const ENCODINGS: &[(&str, &str)] = &[
+    ("utf-8", "Unicode (UTF-8)"),
+    ("utf-16le", "Unicode (UTF-16 LE)"),
+    ("utf-16be", "Unicode (UTF-16 BE)"),
+    ("windows-1252", "Western (Windows-1252)"),
+    ("windows-1250", "Central European (Windows-1250)"),
+    ("windows-1251", "Cyrillic (Windows-1251)"),
+    ("koi8-r", "Cyrillic (KOI8-R)"),
+    ("windows-1253", "Greek (Windows-1253)"),
+    ("windows-1254", "Turkish (Windows-1254)"),
+    ("windows-1255", "Hebrew (Windows-1255)"),
+    ("windows-1256", "Arabic (Windows-1256)"),
+    ("shift_jis", "Japanese (Shift JIS)"),
+    ("euc-jp", "Japanese (EUC-JP)"),
+    ("gbk", "Chinese, Simplified (GBK)"),
+    ("big5", "Chinese, Traditional (Big5)"),
+    ("euc-kr", "Korean (EUC-KR)"),
+];
+
 /// Editors offered for "Open in Editor", most likely first. (name, bundle id)
 const EDITORS: &[(&str, &str)] = &[
     ("VS Code", "com.microsoft.VSCode"),
@@ -169,6 +189,12 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     }
     let open_with = open_with.build()?;
 
+    // Detection is a guess: let the user pick. Ids are WHATWG labels the frontend passes back to Rust.
+    let mut reopen_with = SubmenuBuilder::new(app, "Reopen with Encoding").text("encoding:auto", "Automatic").separator();
+    for (label, name) in ENCODINGS {
+        reopen_with = reopen_with.text(format!("encoding:{label}"), *name);
+    }
+    let reopen_with = reopen_with.build()?;
     let file = SubmenuBuilder::new(app, "File")
         .item(&MenuItemBuilder::with_id("open", "Open…").accelerator("CmdOrCtrl+O").build(app)?)
         .item(&open_recent)
@@ -176,6 +202,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&open_in)
         .item(&open_with)
         .text("reveal", "Reveal in Finder")
+        .item(&reopen_with)
         .separator()
         .close_window()
         .build()?;
@@ -241,7 +268,7 @@ fn focused_file(app: &AppHandle) -> Option<(String, PathBuf)> {
 
 pub fn handle(app: &AppHandle, event: MenuEvent) {
     let id = event.id().as_ref();
-    if FRONTEND_COMMANDS.contains(&id) {
+    if FRONTEND_COMMANDS.contains(&id) || id.starts_with("encoding:") {
         if let Some(label) = app.webview_windows().into_iter().find(|(_, w)| w.is_focused().unwrap_or(false)).map(|(l, _)| l) {
             let _ = app.emit_to(EventTarget::webview_window(label), "menu", id);
         } else if id == "default-apps" {

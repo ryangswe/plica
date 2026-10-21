@@ -27,6 +27,21 @@ function lineHtml(raw: string): string {
   return escapeHtml(raw);
 }
 
+/**
+ * Entries per level, for the chips: a stack trace is one error, not one per line. In logs with
+ * timestamps an entry starts at a timestamped line; otherwise every line with its own level counts.
+ */
+export function countEntries(lines: string[], levels: Level[]): Record<Level, number> {
+  const plain = lines.map(stripAnsi);
+  const stamped = plain.some((l) => TS_RE.test(l));
+  const counts = { error: 0, warn: 0, info: 0, debug: 0, none: 0 };
+  plain.forEach((l, i) => {
+    const starts = stamped ? TS_RE.test(l) : !CONTINUATION_RE.test(l);
+    if (starts) counts[levels[i]]++;
+  });
+  return counts;
+}
+
 export const logRenderer: Renderer = {
   id: "log",
   label: "Log",
@@ -45,6 +60,7 @@ export const logRenderer: Renderer = {
     }
     const counts = { error: 0, warn: 0, info: 0, debug: 0, none: 0 };
     levels.forEach((l) => counts[l]++);
+    const entries = countEntries(lines, levels);
 
     const state = ctx.state as { filter?: string; hidden?: Level[]; follow?: boolean };
     const hidden = new Set<Level>(state.hidden ?? []);
@@ -52,7 +68,9 @@ export const logRenderer: Renderer = {
     const filter = el("input", { type: "search", placeholder: "Filter lines…", "aria-label": "Filter lines" });
     filter.value = state.filter ?? "";
     const chips = LEVELS.filter((l) => counts[l] > 0).map((l) => {
-      const b = el("button", { class: `chip chip-${l}`, "aria-pressed": String(!hidden.has(l)) }, `${l} ${counts[l].toLocaleString()}`);
+      const n = entries[l] || counts[l];
+      const what = `${n.toLocaleString()} ${l} entr${n === 1 ? "y" : "ies"} (${counts[l].toLocaleString()} line${counts[l] === 1 ? "" : "s"})`;
+      const b = el("button", { class: `chip chip-${l}`, "aria-pressed": String(!hidden.has(l)), title: `${what}. Click to show or hide.` }, `${l} ${n.toLocaleString()}`);
       b.addEventListener("click", () => {
         hidden.has(l) ? hidden.delete(l) : hidden.add(l);
         b.setAttribute("aria-pressed", String(!hidden.has(l)));

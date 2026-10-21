@@ -17,6 +17,8 @@ use std::{
     },
 };
 
+#[cfg(target_os = "macos")]
+mod chrome;
 mod defaults;
 mod encoding;
 #[cfg(target_os = "macos")]
@@ -89,11 +91,29 @@ fn read_file_data(path: &Path) -> Result<FileData, String> {
 }
 
 #[tauri::command]
-fn read_file(path: String) -> Result<FileData, String> {
-    read_file_data(Path::new(&path))
+fn read_file(path: String, encoding: Option<String>) -> Result<FileData, String> {
+    let mut data = read_file_data(Path::new(&path))?;
+    // "Reopen with Encoding": decode again as the user asked (detection is a guess).
+    if let Some(label) = encoding.filter(|_| !data.binary) {
+        let bytes = std::fs::read(&path).map_err(|e| format!("{path}: {e}"))?;
+        let bytes = &bytes[..bytes.len().min(MAX_BYTES as usize)];
+        let (text, enc) = encoding::decode_as(bytes, &label).ok_or_else(|| format!("Unknown encoding: {label}"))?;
+        data.text = text;
+        data.encoding = enc.name().to_string();
+    }
+    Ok(data)
 }
 
 /// Called once by each window's frontend after it has set up its event listeners.
+/// The page listens for `window-chrome` now: send it the current state (macOS; nothing elsewhere).
+#[tauri::command]
+fn resend_window_chrome(window: WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    chrome::resend(window.app_handle(), window.label());
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
+}
+
 /// Called by each window's frontend after loading: a command it was opened to run, if any.
 #[tauri::command]
 fn take_pending_command(window: WebviewWindow, state: State<AppState>) -> Option<String> {
@@ -233,7 +253,13 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String
         .zoom_hotkeys_enabled(true); // Ctrl/Cmd + / - / 0 to zoom
     // Native macOS tabs: Window → Merge All Windows, and the "Prefer tabs" system setting.
     #[cfg(target_os = "macos")]
-    let builder = builder.tabbing_identifier("plica");
+    let builder = builder
+        .tabbing_identifier("plica")
+        // One toolbar instead of a title bar plus our bar: the page draws under a transparent title
+        // bar, and the traffic lights sit inside our 44px top bar (vertically centered).
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .traffic_light_position(tauri::LogicalPosition::new(16.0, 22.0));
     // Cascade new windows a little so they don't stack exactly on top of each other.
     let builder = if n > 0 {
         let offset = 40.0 + (n % 8) as f64 * 28.0;
@@ -372,7 +398,8 @@ pub fn run() {
             defaults::default_apps,
             defaults::set_default_apps,
             defaults::default_apps_prompt_dismissed,
-            defaults::dismiss_default_apps_prompt
+            defaults::dismiss_default_apps_prompt,
+            resend_window_chrome
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
@@ -381,6 +408,8 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            chrome::start(app.handle());
             let cwd = std::env::current_dir().unwrap_or_default();
             let paths = paths_from_args(std::env::args().skip(1), &cwd);
             let already_open = app.state::<AppState>().windows.lock().unwrap().len();
