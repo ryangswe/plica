@@ -135,6 +135,17 @@ test("html preview is sandboxed (scripts don't run)", async ({ page }) => {
   const frame = page.frameLocator("iframe.html-preview");
   await expect(frame.locator("h1")).toHaveText("Static HTML preview");
   await expect(frame.locator("body")).not.toContainText("SCRIPT RAN");
+  // The iframe fills the view exactly; no stray scrollbar from the inline-element gap.
+  const view = page.locator(".view-scroll");
+  expect(await view.evaluate((v) => v.scrollHeight - v.clientHeight)).toBe(0);
+});
+
+test("svg shows as an image on a background that fills the window", async ({ page }) => {
+  await open(page, "icon.svg");
+  await expect(page.locator("img.svg-preview")).toBeVisible();
+  const [stage, view] = await Promise.all([".center-stage", ".view-scroll"].map((s) => page.locator(s).boundingBox()));
+  expect(stage!.y + stage!.height).toBeCloseTo(view!.y + view!.height, 0);
+  await page.screenshot({ path: `${SHOTS}/13-svg.png` });
 });
 
 test("code files show highlighted source with no toggle", async ({ page }) => {
