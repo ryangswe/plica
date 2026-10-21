@@ -4,12 +4,35 @@ import type { Renderer } from "../types";
 
 const PAGE = 1000;
 
-export function parseDelimited(text: string, delimiter: string): string[][] {
-  const res = Papa.parse<string[]>(text.replace(/^﻿/, ""), {
-    delimiter,
-    skipEmptyLines: "greedy",
-  });
-  return res.data;
+export interface ParsedTable {
+  rows: string[][];
+  /** Widest row, counting every row (not a sample): no field is ever dropped from the table. */
+  width: number;
+  /** Things that make the table differ from a clean grid, in plain words. */
+  problems: string[];
+}
+
+export function parseDelimited(text: string, delimiter: string): ParsedTable {
+  const res = Papa.parse<string[]>(text.replace(/^\ufeff/, ""), { delimiter, skipEmptyLines: "greedy" });
+  const rows = res.data;
+  let width = 0;
+  for (const r of rows) if (r.length > width) width = r.length;
+  const problems: string[] = [];
+  const rowList = (nums: number[]) => nums.slice(0, 3).join(", ") + (nums.length > 3 ? ` and ${nums.length - 3} more` : "");
+  // "UndetectableDelimiter" just means a single-column file.
+  const errors = res.errors.filter((e) => e.code !== "UndetectableDelimiter");
+  if (errors.length) {
+    const lines = [...new Set(errors.map((e) => (e.row ?? 0) + 1))];
+    problems.push(`${errors[0].message} (data row ${rowList(lines)}). Check Raw to see the file as-is.`);
+  }
+  const headerLen = rows[0]?.length ?? 0;
+  const ragged = rows.slice(1).flatMap((r, i) => (r.length !== headerLen ? [i + 1] : []));
+  if (ragged.length) {
+    problems.push(
+      `${ragged.length.toLocaleString()} row${ragged.length === 1 ? " has" : "s have"} a different number of fields than the header (row ${rowList(ragged)}).`,
+    );
+  }
+  return { rows, width, problems };
 }
 
 function compare(a: string, b: string): number {
@@ -26,11 +49,10 @@ function makeTableRenderer(id: string, label: string, extensions: string[], deli
     extensions,
     rawLanguage: "plaintext",
     render(doc, ctx) {
-      const rows = parseDelimited(doc.text, delimiter);
+      const { rows, width, problems } = parseDelimited(doc.text, delimiter);
       if (rows.length === 0) return el("div", { class: "notice" }, "This file is empty.");
       const header = rows[0];
       const body = rows.slice(1);
-      const width = Math.max(...rows.slice(0, 500).map((r) => r.length));
 
       const state = ctx.state as { filter?: string; sortCol?: number; sortDir?: 1 | -1 };
       const root = el("div", { class: "table-view" });
@@ -38,6 +60,7 @@ function makeTableRenderer(id: string, label: string, extensions: string[], deli
       filter.value = state.filter ?? "";
       const count = el("span", { class: "muted" });
       root.append(toolbar(filter, count));
+      for (const p of problems) root.append(el("div", { class: "notice inline", role: "status" }, p));
 
       const table = el("table", { class: "data-table" });
       const thead = el("thead");
@@ -47,7 +70,9 @@ function makeTableRenderer(id: string, label: string, extensions: string[], deli
 
       const headRow = el("tr", {}, el("th", { class: "rownum" }, "#"));
       for (let c = 0; c < width; c++) {
-        const th = el("th", { "data-col": String(c), title: "Click to sort" }, header[c] ?? "");
+        // Columns past the header's end still show (rows with extra fields); label them by number.
+        const th = el("th", { "data-col": String(c), title: "Click to sort" }, header[c] ?? `Column ${c + 1}`);
+        if (c >= header.length) th.classList.add("extra-col");
         th.addEventListener("click", () => {
           if (state.sortCol === c) state.sortDir = state.sortDir === 1 ? -1 : 1;
           else {
