@@ -27,7 +27,7 @@ Working and tested on Linux (in a headless X server):
   (`src-tauri/linux/plica.desktop`) adds the `%F` the default template was missing.
 - Tests: 23 unit tests (vitest + jsdom), 16 browser e2e tests run in both Chromium and WebKit (Playwright
   against `vite preview`, which sends the same CSP as the app, and the tests fail on any CSP violation;
-  screenshots in `test-results/screens/<browser>/`), 3 Rust unit tests. Note: locally, Playwright reuses
+  screenshots in `test-results/screens/<browser>/`), 5 Rust unit tests. Note: locally, Playwright reuses
   whatever is on port 1420, so stop `tauri dev` before `npm run test:e2e` or it tests the dev server
   without the CSP.
 - CI (`.github/workflows/ci.yml`): typecheck, unit, e2e, clippy + cargo test. Pushes check Linux only (private-repo
@@ -51,12 +51,18 @@ per the Tauri docs but untested.
    scroll. Keyboard shortcuts, drag & drop and Copy still need a manual check (step 3).
 3. `npm run tauri build`, then install/open the built app and check:
    - **macOS double-click flow**: set Plica as the default for `.md` (Get Info → Open with → Change All),
-     quit Plica, double-click a `.md` in Finder. Expected: exactly one window showing that file (macOS
-     sends the file via `RunEvent::Opened` *after* launch; `open_paths` in `src-tauri/src/lib.rs` reuses
-     the initial empty window). Double-click a second file while running → second window.
+     quit Plica, double-click a `.md` in Finder. Expected: exactly one window showing that file.
+     *2026-10-21:* `open -a` (same Apple Event as a double-click) showed **two** windows: macOS sends
+     `RunEvent::Opened` *before* `setup` runs, so the file got a window and `setup` added an empty one.
+     Fixed (`startup_windows` in lib.rs); now verified with `open -a`: cold start with 1 or 2 files, plain
+     launch, file into the empty window, second file while running. Opening an already-open file now
+     focuses its window instead of duplicating it. Finder double-click itself: waiting on the owner.
    - Is there a sensible macOS menu bar (Edit → Copy needs to work; Cmd+Q, Cmd+W)? Tauri 2 should add a
      default menu on macOS; if not, add one (see roadmap).
    - Plica appears in Finder's "Open With" for .md/.json/.csv/.ipynb/.log/.diff/.mmd.
+     *2026-10-21:* verified via LaunchServices (`NSWorkspace.URLsForApplicationsToOpenURL`) for every
+     declared type. Tauri only emits a UTI (`LSItemContentTypes`) for JSON; the rest match by extension,
+     which works.
    - Live reload when saving from VS Code / vim (they save via rename; we watch the parent folder).
    - Windows: double-click flow, "Open with" registration from the MSI/NSIS installer, paths with
      backslashes and spaces, relative images.

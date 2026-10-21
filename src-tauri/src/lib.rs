@@ -163,10 +163,28 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Open each path: reuse an empty window if there is one (e.g. the window macOS
+/// The window already showing `path`, if any (compared after resolving symlinks and `..`).
+fn window_showing(windows: &HashMap<String, WindowState>, path: &Path) -> Option<String> {
+    let canon = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let target = canon(path);
+    windows
+        .iter()
+        .filter(|(_, w)| w.current.as_deref().is_some_and(|c| canon(c) == target))
+        .map(|(label, _)| label.clone())
+        .min()
+}
+
+/// Open each path: bring its window forward if it is already open (like Preview),
+/// otherwise reuse an empty window if there is one (e.g. the window macOS
 /// launched us with before telling us which file), otherwise make a new window.
 fn open_paths(app: &AppHandle, paths: Vec<PathBuf>) {
     for path in paths {
+        let existing = window_showing(&app.state::<AppState>().windows.lock().unwrap(), &path);
+        if let Some(w) = existing.and_then(|label| app.get_webview_window(&label)) {
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+            continue;
+        }
         let reuse = {
             let state = app.state::<AppState>();
             let mut windows = state.windows.lock().unwrap();
@@ -202,6 +220,20 @@ fn open_paths(app: &AppHandle, paths: Vec<PathBuf>) {
                 }
             }
         }
+    }
+}
+
+/// Windows to create at startup: one per file argument, or a single empty window.
+/// On macOS a Finder double-click arrives as `RunEvent::Opened` *before* `setup` runs,
+/// and that event has already created the file's window (`already_open > 0`); adding
+/// an empty one as well would leave the user with two windows.
+fn startup_windows(cli_paths: Vec<PathBuf>, already_open: usize) -> Vec<Option<PathBuf>> {
+    if !cli_paths.is_empty() {
+        cli_paths.into_iter().map(Some).collect()
+    } else if already_open == 0 {
+        vec![None]
+    } else {
+        vec![]
     }
 }
 
@@ -252,12 +284,9 @@ pub fn run() {
         .setup(|app| {
             let cwd = std::env::current_dir().unwrap_or_default();
             let paths = paths_from_args(std::env::args().skip(1), &cwd);
-            if paths.is_empty() {
-                create_window(app.handle(), None)?;
-            } else {
-                for p in paths {
-                    create_window(app.handle(), Some(p))?;
-                }
+            let already_open = app.state::<AppState>().windows.lock().unwrap().len();
+            for path in startup_windows(paths, already_open) {
+                create_window(app.handle(), path)?;
             }
             Ok(())
         })
@@ -298,6 +327,35 @@ mod tests {
         let p = dir.join("b.bin");
         File::create(&p).unwrap().write_all(&[1, 2, 0, 3]).unwrap();
         assert!(read_file_data(&p).unwrap().binary);
+    }
+
+    #[test]
+    fn startup_skips_empty_window_when_a_file_is_already_open() {
+        let p = PathBuf::from("/tmp/a.md");
+        // Plain launch: one empty window.
+        assert_eq!(startup_windows(vec![], 0), vec![None]);
+        // macOS double-click: the Opened event already made the file's window.
+        assert_eq!(startup_windows(vec![], 1), Vec::<Option<PathBuf>>::new());
+        // Command line: one window per file.
+        assert_eq!(startup_windows(vec![p.clone()], 0), vec![Some(p)]);
+    }
+
+    #[test]
+    fn finds_the_window_already_showing_a_file() {
+        let dir = std::env::temp_dir().join(format!("plica-test-open-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        File::create(dir.join("a.md")).unwrap();
+        File::create(dir.join("b.md")).unwrap();
+        let mut windows = HashMap::new();
+        windows.insert("w0".to_string(), WindowState::default()); // empty window
+        windows.insert(
+            "w1".to_string(),
+            WindowState { current: Some(dir.join("a.md")), ..Default::default() },
+        );
+        assert_eq!(window_showing(&windows, &dir.join("a.md")), Some("w1".into()));
+        // Same file through a different spelling of the path.
+        assert_eq!(window_showing(&windows, &dir.join("sub/../a.md")), Some("w1".into()));
+        assert_eq!(window_showing(&windows, &dir.join("b.md")), None);
     }
 
     #[test]
