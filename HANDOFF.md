@@ -99,7 +99,7 @@ tests/
 Flow: Rust creates a window per file and stores the path as "pending". The frontend registers listeners,
 then calls `take_initial_file`. Files opened later (macOS Opened event, second launch) either reuse an empty
 window (`open-path` event) or create a new one. `read_file` returns `{path, name, text, size, binary,
-truncated, encoding}` (64 MB cap, NUL byte = binary). `watch_file` watches the parent dir and emits `file-changed`
+truncated, encoding}` (64 MB cap; zero bytes that aren't UTF-16 = binary). `watch_file` watches the parent dir and emits `file-changed`
 to that window only; the frontend debounces and re-reads.
 
 Adding a renderer: create `src/renderers/foo.ts` exporting a `Renderer` (`id`, `label`, `extensions`,
