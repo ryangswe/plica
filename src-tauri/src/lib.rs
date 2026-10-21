@@ -152,6 +152,9 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<()> {
         .inner_size(1000.0, 780.0)
         .min_inner_size(420.0, 320.0)
         .zoom_hotkeys_enabled(true); // Ctrl/Cmd + / - / 0 to zoom
+    // Native macOS tabs: Window → Merge All Windows, and the "Prefer tabs" system setting.
+    #[cfg(target_os = "macos")]
+    let builder = builder.tabbing_identifier("plica");
     // Cascade new windows a little so they don't stack exactly on top of each other.
     let builder = if n > 0 {
         let offset = 40.0 + (n % 8) as f64 * 28.0;

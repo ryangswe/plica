@@ -220,3 +220,5 @@ content on/off, default apps. That's it.
 | 2026-10-20 | **Folder mode deferred** to a later iteration, after more product thinking. Ship a cheap stopgap first: next/previous file in the same folder | Browsing several .md files without piling up windows is useful, but a sidebar is the first step toward a notes app |
 | 2026-10-20 | **Name: Plica**, domain plica.dev, private repo ryangswe/plica during development | Recto/Gander/Sheaf were taken by similar apps; Plica had no software clashes |
 | 2026-10-20 | **Will pay for the Apple Developer Program** ($99/year, recurring) for signing + notarization | Signing is required for anyone beyond tolerant developers; Homebrew is also moving away from unsigned apps |
+| 2026-10-21 | **Preview/Raw toggle is Cmd+/ on macOS** (Ctrl+/ elsewhere); Ctrl+/ does nothing on macOS | Owner tried it on a Mac; feels right |
+| 2026-10-21 | Opening a file that's already open **focuses its window** instead of opening a duplicate | Matches Preview and other macOS document apps |

@@ -48,22 +48,26 @@ per the Tauri docs but untested.
    titles, cascading, local images (asset protocol, paths with spaces) and live reload (rename-save and
    in-place write) work. Fixed along the way (not WebKit-specific): standalone Mermaid diagrams collapsed
    to 300px, the SVG checkerboard stopped short of the window bottom, the HTML preview had a 5px stray
-   scroll. Keyboard shortcuts, drag & drop and Copy still need a manual check (step 3).
-3. `npm run tauri build`, then install/open the built app and check:
+   scroll. Shortcuts, drag & drop and Copy were then checked by the owner in step 3.
+3. `npm run tauri build`, then install/open the built app and check (**macOS: all done 2026-10-21**):
    - **macOS double-click flow**: set Plica as the default for `.md` (Get Info → Open with → Change All),
      quit Plica, double-click a `.md` in Finder. Expected: exactly one window showing that file.
      *2026-10-21:* `open -a` (same Apple Event as a double-click) showed **two** windows: macOS sends
      `RunEvent::Opened` *before* `setup` runs, so the file got a window and `setup` added an empty one.
      Fixed (`startup_windows` in lib.rs); now verified with `open -a`: cold start with 1 or 2 files, plain
      launch, file into the empty window, second file while running. Opening an already-open file now
-     focuses its window instead of duplicating it. Finder double-click itself: waiting on the owner.
+     focuses its window instead of duplicating it. **Owner confirmed in Finder** (cold double-click → one
+     window; second file while running; reopening focuses the existing window).
    - Is there a sensible macOS menu bar (Edit → Copy needs to work; Cmd+Q, Cmd+W)? Tauri 2 should add a
-     default menu on macOS; if not, add one (see roadmap).
+     default menu on macOS; if not, add one (see roadmap). **Confirmed on macOS**: default menu present,
+     Cmd+C / Edit → Copy, Cmd+W, Cmd+Q work. Cmd+/ (Ctrl+/ does nothing on macOS) confirmed by the owner.
    - Plica appears in Finder's "Open With" for .md/.json/.csv/.ipynb/.log/.diff/.mmd.
      *2026-10-21:* verified via LaunchServices (`NSWorkspace.URLsForApplicationsToOpenURL`) for every
      declared type. Tauri only emits a UTI (`LSItemContentTypes`) for JSON; the rest match by extension,
      which works.
    - Live reload when saving from VS Code / vim (they save via rename; we watch the parent folder).
+     **Confirmed on macOS** (VS Code save, plus scripted rename-save and in-place write). Drag & drop onto a
+     window and onto the Dock icon also work.
    - Windows: double-click flow, "Open with" registration from the MSI/NSIS installer, paths with
      backslashes and spaces, relative images.
 4. Fix whatever breaks, then cut `v0.1.0` (see Releasing).
@@ -87,7 +91,8 @@ src-tauri/
 tests/
   fixtures/              sample files for every type (also nice for manual testing)
   unit/                  vitest
-  e2e/                   playwright; writes screenshots to test-results/screens/
+  e2e/                   playwright (Chromium + WebKit); screenshots in test-results/screens/<browser>/
+  macos/smoke.sh         opens files in the installed .app via `open -a` and checks the windows/tabs (local only)
 ```
 
 Flow: Rust creates a window per file and stores the path as "pending". The frontend registers listeners,
@@ -114,8 +119,11 @@ are in [docs/PRODUCT.md](docs/PRODUCT.md). Read it before planning bigger featur
    of the original idea (HTML/DOCX/PDF renderers for Markdown).
 3. **Text encoding**: detect UTF-16 (BOM) and legacy encodings (`encoding_rs` + `chardetng`) in
    `read_file_data`; Excel CSVs on Windows are often UTF-16/Windows-1252 and currently show garbled.
-4. **macOS native tabs**: `.tabbing_identifier("plica")` on the window builder (macOS only) so
-   Window → Merge All Windows works. In-app tabs (setting) maybe later; see docs/PRODUCT.md §10.
+4. ~~**macOS native tabs**~~ **Done 2026-10-21**: `.tabbing_identifier("plica")` in `create_window`
+   (macOS only). Tauri's default menu registers its Window menu with AppKit, so Show Tab Bar / Merge All
+   Windows / Move Tab to New Window appear there; "Prefer tabs: Always" opens files as tabs, and reopening
+   a file selects its tab. Covered by `tests/macos/smoke.sh`. In-app tabs (setting) maybe later; see
+   docs/PRODUCT.md §10.
 5. **Next / previous file in the same folder** (e.g. Cmd/Ctrl+Alt+→/←, plus small arrows in the top bar):
    a Rust command lists sibling files of supported types (sorted, ignoring hidden files); the frontend
    steps through them in the current window. Cheap stopgap for browsing docs folders; full folder mode

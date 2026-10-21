@@ -12,6 +12,8 @@ Product decisions and open questions: docs/PRODUCT.md.
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml`
   (also before committing; CI runs both)
 - `npm run tauri build`: installers for the current OS
+- `tests/macos/smoke.sh`: after installing the built .app on a Mac, checks double-click/open flows and
+  native tabs (run it when touching window or file-opening code in `lib.rs`)
 
 ## Conventions
 
