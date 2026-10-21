@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
 
 const FIX = path.resolve("tests/fixtures");
-const SHOTS = path.resolve("test-results/screens");
+let SHOTS = "";
 const mod = process.platform === "darwin" ? "Meta" : "Control";
 
 async function open(page: Page, name: string) {
@@ -11,7 +11,9 @@ async function open(page: Page, name: string) {
 }
 
 let cspViolations: string[] = [];
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, info) => {
+  // Screenshots go to test-results/screens/<browser>/ so the projects don't overwrite each other.
+  SHOTS = path.resolve("test-results/screens", info.project.name);
   cspViolations = [];
   page.on("console", (m) => {
     if (m.type() === "error" && /Content Security Policy|Refused to/i.test(m.text())) cspViolations.push(m.text());
@@ -120,7 +122,11 @@ test("log: level chips and filter", async ({ page }) => {
 
 test("mermaid file renders a diagram", async ({ page }) => {
   await open(page, "flow.mmd");
-  await expect(page.locator(".mermaid-diagram svg")).toBeVisible({ timeout: 15000 });
+  const svg = page.locator(".mermaid-diagram svg");
+  await expect(svg).toBeVisible({ timeout: 15000 });
+  // Shown at its natural size (max-width set by Mermaid), not collapsed to the 300px fallback.
+  const { width, max } = await svg.evaluate((s) => ({ width: s.getBoundingClientRect().width, max: parseFloat(s.style.maxWidth) }));
+  expect(width).toBeCloseTo(max, 0);
   await page.screenshot({ path: `${SHOTS}/08-mermaid.png` });
 });
 
@@ -167,6 +173,9 @@ test("dark mode", async ({ browser }) => {
 test("narrow window stays usable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 760 });
   await open(page, "sample.md");
+  // The file name updates before the (async) Markdown render finishes; wait for the content.
+  await expect(page.locator(".markdown-body h1")).toBeVisible();
+  await expect(page.locator(".markdown-body table")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
   await page.screenshot({ path: `${SHOTS}/12-narrow.png` });

@@ -9,7 +9,11 @@ export default defineConfig({
     baseURL: "http://localhost:1420",
     viewport: { width: 1200, height: 820 },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1200, height: 820 } } }],
+  projects: [
+    // Chromium is what WebView2 uses on Windows; WebKit is close to WKWebView (macOS) and WebKitGTK (Linux).
+    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1200, height: 820 } } },
+    { name: "webkit", use: { ...devices["Desktop Safari"], viewport: { width: 1200, height: 820 } } },
+  ],
   webServer: {
     command: "npm run build && npm run preview",
     url: "http://localhost:1420",
