@@ -114,9 +114,7 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
 
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
-        let relevant = matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_))
-            && event.paths.iter().any(|p| p.file_name() == Some(file_name.as_os_str()));
-        if relevant {
+        if concerns_file(&event, &file_name) {
             let _ = app.emit_to(EventTarget::webview_window(label.clone()), "file-changed", payload.clone());
         }
     })
@@ -162,6 +160,13 @@ fn select_tab(window: WebviewWindow, n: usize) {
     }
     #[cfg(not(target_os = "macos"))]
     let _ = (window, n);
+}
+
+/// Whether a watcher event in the file's folder is about the file. Removals count too, so the
+/// frontend re-reads and can tell the user the file is gone instead of silently showing old content.
+fn concerns_file(event: &notify::Event, file_name: &std::ffi::OsStr) -> bool {
+    matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_))
+        && event.paths.iter().any(|p| p.file_name() == Some(file_name))
 }
 
 #[tauri::command]
@@ -406,6 +411,18 @@ mod tests {
         // Same file through a different spelling of the path.
         assert_eq!(window_showing(&windows, &dir.join("sub/../a.md")), Some("w1".into()));
         assert_eq!(window_showing(&windows, &dir.join("b.md")), None);
+    }
+
+    #[test]
+    fn watcher_reports_changes_and_removals_of_the_file_only() {
+        use notify::event::{CreateKind, ModifyKind, RemoveKind};
+        let ev = |kind: EventKind, p: &str| notify::Event::new(kind).add_path(PathBuf::from(p));
+        let name = std::ffi::OsStr::new("a.md");
+        assert!(concerns_file(&ev(EventKind::Modify(ModifyKind::Any), "/d/a.md"), name));
+        assert!(concerns_file(&ev(EventKind::Create(CreateKind::File), "/d/a.md"), name));
+        assert!(concerns_file(&ev(EventKind::Remove(RemoveKind::File), "/d/a.md"), name));
+        assert!(!concerns_file(&ev(EventKind::Remove(RemoveKind::File), "/d/b.md"), name));
+        assert!(!concerns_file(&ev(EventKind::Access(notify::event::AccessKind::Any), "/d/a.md"), name));
     }
 
     #[test]

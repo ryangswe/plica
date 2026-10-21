@@ -36,3 +36,16 @@ export function resolveRelative(fromFile: string, rel: string): string {
   }
   return parts.join(sep);
 }
+
+/** Split "other.md#Set%20up" into the path part and the decoded fragment ("Set up"), if any. */
+export function splitFragment(href: string): { path: string; fragment: string | null } {
+  const i = href.indexOf("#");
+  if (i < 0) return { path: href, fragment: null };
+  let fragment = href.slice(i + 1);
+  try {
+    fragment = decodeURIComponent(fragment);
+  } catch {
+    /* keep as-is */
+  }
+  return { path: href.slice(0, i), fragment: fragment || null };
+}
