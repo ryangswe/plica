@@ -81,7 +81,7 @@ npm run tauri build        # build installers for your OS into src-tauri/target/
 ```
 
 Adding a file type is one file in `src/renderers/` plus a line in `src/renderers/index.ts`. See
-[HANDOFF.md](HANDOFF.md) for the architecture and roadmap.
+[ARCHITECTURE.md](ARCHITECTURE.md) for how it's built.
 
 ## License
 

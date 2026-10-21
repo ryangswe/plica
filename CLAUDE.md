@@ -1,8 +1,10 @@
 # Plica
 
 Cross-platform read-only viewer for Markdown and other dev files (Tauri 2 + TypeScript, no UI framework).
-**Read HANDOFF.md first**: status, what's unverified, architecture, roadmap.
-Product decisions and open questions: docs/PRODUCT.md.
+How the code is organized, tested and released: ARCHITECTURE.md.
+Maintainers: status, roadmap and product decisions live in the private `plica-docs` repo, cloned next to
+this one (`~/Workspace/plica-docs`). If you have it, **read its HANDOFF.md first**; record decisions in its
+PRODUCT.md. Never copy those notes into this repo, which will be public.
 
 ## Commands
 
@@ -26,4 +28,5 @@ Product decisions and open questions: docs/PRODUCT.md.
   and tests in `tests/unit/` and/or `tests/e2e/`.
 - Rust lives in `src-tauri/src/lib.rs`, plus `encoding.rs` for decoding; split out another module when
   `lib.rs` grows past ~500 lines.
-- Update HANDOFF.md (status + roadmap) when you finish something on it.
+- Update plica-docs/HANDOFF.md (status + roadmap) when you finish something on it, and commit/push that
+  repo too.
