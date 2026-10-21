@@ -6,7 +6,8 @@
 #   tests/macos/smoke.sh [/Applications/Plica.app]
 #
 # Needs Screen Recording permission for your terminal (to read window titles).
-# Quits Plica when done. Uses a Plica-only "prefer tabs" setting and removes it again.
+# Quits Plica when done. Uses a Plica-only "prefer tabs" setting and removes it again, and restores
+# Plica's settings.json (Open Recent, editor choice) afterwards.
 set -euo pipefail
 APP="${1:-/Applications/Plica.app}"
 FIX="$(cd "$(dirname "$0")/../fixtures" && pwd)"
@@ -31,7 +32,15 @@ windows() { osascript -l JavaScript "$HERE/windows.js" | awk -F'\t' -v m="${1:-a
 expect() { # description, expected, actual
   if [[ "$2" == "$3" ]]; then echo "ok   $1"; else echo "FAIL $1: expected [$2], got [$3]"; fails=$((fails + 1)); fi
 }
-cleanup() { quit; defaults delete dev.plica.viewer AppleWindowTabbingMode >/dev/null 2>&1 || true; }
+# The test opens fixtures, which would land in the user's Open Recent list: put their settings back after.
+SETTINGS="$HOME/Library/Application Support/dev.plica.viewer/settings.json"
+BACKUP="$(mktemp)"; had_settings=0; [[ -f "$SETTINGS" ]] && cp "$SETTINGS" "$BACKUP" && had_settings=1
+cleanup() {
+  quit
+  defaults delete dev.plica.viewer AppleWindowTabbingMode >/dev/null 2>&1 || true
+  if ((had_settings)); then cp "$BACKUP" "$SETTINGS"; else rm -f "$SETTINGS"; fi
+  rm -f "$BACKUP"
+}
 trap cleanup EXIT
 
 quit

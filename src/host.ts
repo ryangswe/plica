@@ -16,6 +16,8 @@ export interface Host {
     dragging(on: boolean): void;
     /** A native menu command (macOS menu bar), e.g. "toggle-raw", "find", "copy-path". */
     command(id: string): void;
+    /** A short message from the desktop shell, e.g. "Opening in VS Code…". */
+    notice(msg: string): void;
   }): Promise<void>;
   /** True when a native menu bar owns the standard shortcuts (Cmd+O, Cmd+F, Cmd+/...). */
   nativeMenu: boolean;
@@ -128,9 +130,10 @@ export async function createTauriHost(): Promise<Host> {
     kind: "tauri",
     canReadPaths: true,
     nativeMenu: /Mac/.test(navigator.platform),
-    async init({ openPath, error, dragging, command }) {
+    async init({ openPath, error, dragging, command, notice }) {
       await win.listen<string>("open-path", (e) => openPath(e.payload));
       await win.listen<string>("menu", (e) => command(e.payload));
+      await win.listen<string>("notice", (e) => notice(e.payload));
       await win.listen<string>("file-changed", () => changeHandler?.());
       await win.onDragDropEvent((e) => {
         const p = e.payload;

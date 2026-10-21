@@ -331,6 +331,7 @@ async function boot() {
     error: (m) => showToast(m, 3500),
     dragging: (on) => (dropOverlay.hidden = !on),
     command: runCommand,
+    notice: (m) => showToast(m, 2500),
   });
 }
 

@@ -11,12 +11,12 @@ use std::sync::Mutex;
 
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2::{sel, MainThreadMarker};
-use objc2_app_kit::{NSApplication, NSDocumentController, NSWorkspace};
+use objc2::MainThreadMarker;
+use objc2_app_kit::{NSDocumentController, NSWorkspace};
 use objc2_foundation::{NSDictionary, NSString, NSURL, NSUserDefaults};
 use tauri::menu::{
     AboutMetadata, CheckMenuItem, CheckMenuItemBuilder, Menu, MenuBuilder, MenuEvent, MenuItem, MenuItemBuilder,
-    SubmenuBuilder, WINDOW_SUBMENU_ID,
+    PredefinedMenuItem, Submenu, SubmenuBuilder, WINDOW_SUBMENU_ID,
 };
 use tauri::{AppHandle, Emitter, EventTarget, Manager, Wry};
 use tauri_plugin_dialog::DialogExt;
@@ -68,24 +68,77 @@ fn settings_path(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok().map(|d| d.join("settings.json"))
 }
 
-fn saved_editor(app: &AppHandle) -> Option<String> {
-    let text = std::fs::read_to_string(settings_path(app)?).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&text).ok()?;
-    json.get("editor")?.as_str().map(str::to_string)
-}
-
-fn save_editor(app: &AppHandle, bundle_id: &str) {
-    let Some(path) = settings_path(app) else { return };
-    let mut json: serde_json::Value = std::fs::read_to_string(&path)
-        .ok()
+/// Small JSON settings file next to the app's other data: {"editor": "...", "recent": ["..."]}.
+fn read_settings(app: &AppHandle) -> serde_json::Value {
+    settings_path(app)
+        .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|t| serde_json::from_str(&t).ok())
         .filter(|v: &serde_json::Value| v.is_object())
-        .unwrap_or_else(|| serde_json::json!({}));
-    json["editor"] = serde_json::Value::String(bundle_id.to_string());
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+fn write_setting(app: &AppHandle, key: &str, value: serde_json::Value) {
+    let Some(path) = settings_path(app) else { return };
+    let mut json = read_settings(app);
+    json[key] = value;
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
     let _ = std::fs::write(path, serde_json::to_string_pretty(&json).unwrap_or_default());
+}
+
+const MAX_RECENT: usize = 10;
+
+/// Move `path` to the front of the recent list (no duplicates, at most `MAX_RECENT`).
+pub fn push_recent(list: &mut Vec<PathBuf>, path: PathBuf) {
+    list.retain(|p| *p != path);
+    list.insert(0, path);
+    list.truncate(MAX_RECENT);
+}
+
+/// Menu labels: the file name, plus its folder when two recent files share a name.
+pub fn recent_labels(list: &[PathBuf]) -> Vec<String> {
+    let name = |p: &PathBuf| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    list.iter()
+        .map(|p| {
+            let n = name(p);
+            if list.iter().filter(|q| name(q) == n).count() > 1 {
+                let folder = p.parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().into_owned()).unwrap_or_default();
+                format!("{n} — {folder}")
+            } else {
+                n
+            }
+        })
+        .collect()
+}
+
+/// File → Open Recent, kept by Plica (AppKit only fills its own recent menu in nib-based apps).
+struct RecentMenu {
+    submenu: Submenu<Wry>,
+    files: Mutex<Vec<PathBuf>>,
+}
+
+fn rebuild_recent(app: &AppHandle, menu: &RecentMenu) {
+    let files = menu.files.lock().unwrap().clone();
+    while let Ok(Some(_)) = menu.submenu.remove_at(0) {}
+    for (i, label) in recent_labels(&files).into_iter().enumerate() {
+        if let Ok(item) = MenuItemBuilder::with_id(format!("recent:{i}"), label).build(app) {
+            let _ = menu.submenu.append(&item);
+        }
+    }
+    if !files.is_empty() {
+        if let Ok(sep) = PredefinedMenuItem::separator(app) {
+            let _ = menu.submenu.append(&sep);
+        }
+    }
+    if let Ok(clear) = MenuItemBuilder::with_id("clear-recent", "Clear Menu").enabled(!files.is_empty()).build(app) {
+        let _ = menu.submenu.append(&clear);
+    }
+}
+
+fn save_recent(app: &AppHandle, files: &[PathBuf]) {
+    let list = files.iter().map(|p| serde_json::Value::String(p.to_string_lossy().into_owned())).collect();
+    write_setting(app, "recent", serde_json::Value::Array(list));
 }
 
 pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
@@ -106,13 +159,11 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .quit()
         .build()?;
 
-    // AppKit fills this submenu itself once its "Clear Menu" item has the right action (see
-    // `after_launch`), and keeps the Dock menu's recent files in sync.
-    let open_recent = SubmenuBuilder::with_id(app, "open-recent", "Open Recent").text("clear-recent", "Clear Menu").build()?;
+    let open_recent = SubmenuBuilder::with_id(app, "open-recent", "Open Recent").build()?;
 
+    let settings = read_settings(app);
     let installed = installed_editors();
-    let saved = saved_editor(app);
-    let current = pick_editor(saved.as_deref(), &installed);
+    let current = pick_editor(settings.get("editor").and_then(|v| v.as_str()), &installed);
     let open_in = MenuItemBuilder::with_id("open-in-editor", format!("Open in {}", current.map_or("Editor", editor_name)))
         .accelerator("CmdOrCtrl+E")
         .enabled(current.is_some())
@@ -169,6 +220,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let window = SubmenuBuilder::with_id(app, WINDOW_SUBMENU_ID, "Window").minimize().maximize().separator().bring_all_to_front().build()?;
 
     app.manage(EditorMenu { open_in, choices, current: Mutex::new(current) });
+    let recent_files: Vec<PathBuf> = settings
+        .get("recent")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).map(PathBuf::from).collect())
+        .unwrap_or_default();
+    let recent = RecentMenu { submenu: open_recent.clone(), files: Mutex::new(recent_files) };
+    rebuild_recent(app, &recent);
+    app.manage(recent);
     MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view, &window]).build()
 }
 
@@ -194,7 +253,16 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
     match id {
         "open" => {
             let handle = app.clone();
-            app.dialog().file().pick_files(move |picked| {
+            let mut dialog = app.dialog().file();
+            // Start where the user last was: the folder of the current or most recent file.
+            let start = focused_file(app)
+                .map(|(_, p)| p)
+                .or_else(|| app.state::<RecentMenu>().files.lock().unwrap().first().cloned())
+                .and_then(|p| p.parent().map(Path::to_path_buf));
+            if let Some(dir) = start.filter(|d| d.is_dir()) {
+                dialog = dialog.set_directory(dir);
+            }
+            dialog.pick_files(move |picked| {
                 let paths = picked.unwrap_or_default().into_iter().filter_map(|p| p.into_path().ok()).collect();
                 crate::open_paths(&handle, paths);
             });
@@ -207,8 +275,30 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
         "open-in-editor" => {
             let menu = app.state::<EditorMenu>();
             let editor = *menu.current.lock().unwrap();
-            if let (Some(editor), Some((_, path))) = (editor, focused_file(app)) {
-                open_in_editor(editor, &path);
+            if let (Some(editor), Some((label, path))) = (editor, focused_file(app)) {
+                open_in_editor(app, &label, editor, &path);
+            }
+        }
+        "clear-recent" => {
+            let menu = app.state::<RecentMenu>();
+            menu.files.lock().unwrap().clear();
+            save_recent(app, &[]);
+            rebuild_recent(app, &menu);
+            if let Some(mtm) = MainThreadMarker::new() {
+                // SAFETY: a nil sender is allowed for this action method.
+                unsafe { NSDocumentController::sharedDocumentController(mtm).clearRecentDocuments(None) };
+            }
+        }
+        _ if id.starts_with("recent:") => {
+            let menu = app.state::<RecentMenu>();
+            let Some(path) = id[7..].parse::<usize>().ok().and_then(|i| menu.files.lock().unwrap().get(i).cloned()) else { return };
+            if path.is_file() {
+                crate::open_paths(app, vec![path]);
+            } else {
+                // Moved or deleted since: drop it rather than open an error.
+                menu.files.lock().unwrap().retain(|p| *p != path);
+                save_recent(app, &menu.files.lock().unwrap());
+                rebuild_recent(app, &menu);
             }
         }
         _ if id.starts_with("editor:") => {
@@ -219,47 +309,54 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
                 let _ = item.set_checked(eid == chosen);
             }
             let _ = menu.open_in.set_text(format!("Open in {}", editor_name(chosen)));
-            save_editor(app, chosen);
-            if let Some((_, path)) = focused_file(app) {
-                open_in_editor(chosen, &path);
+            write_setting(app, "editor", serde_json::Value::String(chosen.to_string()));
+            if let Some((label, path)) = focused_file(app) {
+                open_in_editor(app, &label, chosen, &path);
             }
         }
         _ => {}
     }
 }
 
-fn open_in_editor(bundle_id: &str, path: &Path) {
+/// When the last "Open in Editor" happened, to ignore repeats while a slow editor is still starting.
+static LAST_EDITOR_OPEN: Mutex<Option<(PathBuf, std::time::Instant)>> = Mutex::new(None);
+
+/// True if this file was just sent to an editor (within `window`), so a repeated Cmd+E is ignored.
+pub fn is_repeat(last: &Option<(PathBuf, std::time::Instant)>, path: &Path, now: std::time::Instant, window: std::time::Duration) -> bool {
+    matches!(last, Some((p, t)) if p == path && now.duration_since(*t) < window)
+}
+
+fn open_in_editor(app: &AppHandle, label: &str, bundle_id: &str, path: &Path) {
+    let now = std::time::Instant::now();
+    {
+        let mut last = LAST_EDITOR_OPEN.lock().unwrap();
+        if is_repeat(&last, path, now, std::time::Duration::from_secs(3)) {
+            return;
+        }
+        *last = Some((path.to_path_buf(), now));
+    }
+    // Editors can take a few seconds to start: say something right away.
+    let _ = app.emit_to(EventTarget::webview_window(label), "notice", format!("Opening in {}…", editor_name(bundle_id)));
     let _ = Command::new("open").arg("-b").arg(bundle_id).arg(path).spawn();
 }
 
-/// Called once the menu is installed (main thread): hand the Open Recent submenu to AppKit.
-pub fn after_launch() {
+/// A file was shown: put it at the top of Open Recent, and tell macOS too (Dock menu, Finder's
+/// recent items). Main thread only.
+pub fn note_recent(app: &AppHandle, path: &Path) {
     let Some(mtm) = MainThreadMarker::new() else { return };
-    let app = NSApplication::sharedApplication(mtm);
-    let Some(main) = app.mainMenu() else { return };
-    let find = |menu: &objc2_app_kit::NSMenu, title: &str| menu.itemWithTitle(&NSString::from_str(title));
-    let clear = find(&main, "File")
-        .and_then(|f| f.submenu())
-        .and_then(|f| find(&f, "Open Recent"))
-        .and_then(|r| r.submenu())
-        .and_then(|r| find(&r, "Clear Menu"));
-    if let Some(clear) = clear {
-        // SAFETY: standard AppKit action; a nil target sends it up the responder chain, which ends at
-        // the shared NSDocumentController that implements it.
-        unsafe {
-            clear.setTarget(None);
-            clear.setAction(Some(sel!(clearRecentDocuments:)));
-        }
-        let _ = NSDocumentController::sharedDocumentController(mtm);
+    if let Some(menu) = app.try_state::<RecentMenu>() {
+        let files = {
+            let mut files = menu.files.lock().unwrap();
+            push_recent(&mut files, path.to_path_buf());
+            files.clone()
+        };
+        save_recent(app, &files);
+        rebuild_recent(app, &menu);
     }
-}
-
-/// Add a file to Open Recent (and the Dock menu). Main thread only; silently ignored elsewhere.
-pub fn note_recent(path: &Path) {
-    let Some(mtm) = MainThreadMarker::new() else { return };
-    let Some(path) = path.to_str() else { return };
-    let url = NSURL::fileURLWithPath(&NSString::from_str(path));
-    NSDocumentController::sharedDocumentController(mtm).noteNewRecentDocumentURL(&url);
+    if let Some(p) = path.to_str() {
+        let url = NSURL::fileURLWithPath(&NSString::from_str(p));
+        NSDocumentController::sharedDocumentController(mtm).noteNewRecentDocumentURL(&url);
+    }
 }
 
 /// Give AppKit's own "Merge All Windows" item the shortcut ⇧⌘M. Registered (not saved) defaults, so a
@@ -288,5 +385,36 @@ mod tests {
         assert_eq!(pick_editor(Some("dev.zed.Zed"), &installed), Some("com.microsoft.VSCode"));
         assert_eq!(pick_editor(Some("dev.zed.Zed"), &[]), None);
         assert_eq!(editor_name("com.todesktop.230313mzl4w4u92"), "Cursor");
+    }
+
+    #[test]
+    fn repeated_open_in_editor_is_ignored_briefly() {
+        use std::time::{Duration, Instant};
+        let t0 = Instant::now();
+        let last = Some((PathBuf::from("/d/a.md"), t0));
+        let w = Duration::from_secs(3);
+        assert!(is_repeat(&last, Path::new("/d/a.md"), t0 + Duration::from_secs(1), w));
+        assert!(!is_repeat(&last, Path::new("/d/a.md"), t0 + Duration::from_secs(4), w));
+        assert!(!is_repeat(&last, Path::new("/d/b.md"), t0 + Duration::from_secs(1), w));
+        assert!(!is_repeat(&None, Path::new("/d/a.md"), t0, w));
+    }
+
+    #[test]
+    fn recent_list_moves_to_front_dedupes_and_caps() {
+        let mut list = Vec::new();
+        for i in 0..12 {
+            push_recent(&mut list, PathBuf::from(format!("/d/{i}.md")));
+        }
+        assert_eq!(list.len(), MAX_RECENT);
+        assert_eq!(list[0], PathBuf::from("/d/11.md"));
+        push_recent(&mut list, PathBuf::from("/d/5.md"));
+        assert_eq!(list[0], PathBuf::from("/d/5.md"));
+        assert_eq!(list.iter().filter(|p| p.as_path() == Path::new("/d/5.md")).count(), 1);
+    }
+
+    #[test]
+    fn recent_labels_add_the_folder_only_for_duplicate_names() {
+        let list = [PathBuf::from("/a/README.md"), PathBuf::from("/b/README.md"), PathBuf::from("/a/notes.md")];
+        assert_eq!(recent_labels(&list), ["README.md — a", "README.md — b", "notes.md"]);
     }
 }

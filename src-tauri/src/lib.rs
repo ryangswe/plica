@@ -133,7 +133,8 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
     #[cfg(target_os = "macos")]
     {
         let recent = PathBuf::from(&path);
-        let _ = window.run_on_main_thread(move || menu::note_recent(&recent));
+        let app = window.app_handle().clone();
+        let _ = window.run_on_main_thread(move || menu::note_recent(&app, &recent));
     }
     Ok(())
 }
@@ -357,7 +358,6 @@ pub fn run() {
     app.run(|_app, _event| {
         #[cfg(target_os = "macos")]
         match _event {
-            tauri::RunEvent::Ready => menu::after_launch(),
             // Finder "Open" / double-click arrives as an event, not as arguments.
             tauri::RunEvent::Opened { urls } => {
                 let paths = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
