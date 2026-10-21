@@ -30,9 +30,21 @@
       ],
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "**"
-        ]
+        "scope": {
+          "allow": [
+            "**"
+          ],
+          "deny": [
+            "**/.ssh/**",
+            "**/.gnupg/**",
+            "**/.aws/**",
+            "**/.kube/**",
+            "**/.docker/**",
+            "**/.netrc",
+            "**/.git-credentials"
+          ],
+          "requireLiteralLeadingDot": false
+        }
       }
     }
   },
