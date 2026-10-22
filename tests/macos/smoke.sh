@@ -55,6 +55,22 @@ launch; sleep 2.5;                       expect "plain launch: one empty window"
 open_file "$FIX/app.log";                expect "file goes into the empty window" "app.log" "$(windows)"
 quit
 
+# Batches (Window → Open Multiple Files as Tabs, on by default): several files at once, or a folder,
+# become one window with a tab per file, in name order, binaries skipped.
+count() { wc -w <<<"$1" | tr -d ' '; }
+open_file "$FIX/sample.md" "$FIX/app.log" "$FIX/data.csv"
+expect "three files at once: all open" "app.log data.csv sample.md" "$(windows)"
+expect "three files at once: as tabs in one window" "1" "$(count "$(windows on)")"
+quit
+BATCH="$(mktemp -d)"; mkdir "$BATCH/sub"
+for n in a1 a2 a10; do printf '# %s\n' "$n" > "$BATCH/$n.md"; done
+printf '\x89PNG\x00\x00\x01' > "$BATCH/logo.png"; printf 'x' > "$BATCH/.hidden.md"; printf 'x' > "$BATCH/sub/inner.md"
+open_file "$BATCH"
+expect "folder: its text files, no hidden/binary/subfolder" "a1.md a10.md a2.md" "$(windows)"
+expect "folder: first by name in front" "a1.md" "$(windows on)"
+rm -rf "$BATCH"
+quit
+
 defaults write dev.plica.viewer AppleWindowTabbingMode always
 open_file "$FIX/sample.md"; open_file "$FIX/data.csv"
 expect "prefer tabs: both files in one window" "data.csv" "$(windows on)"

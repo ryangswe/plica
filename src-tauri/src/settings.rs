@@ -41,6 +41,12 @@ pub fn set_remote_content(app: &AppHandle, allowed: bool) {
     let _ = app.emit("remote-content", allowed);
 }
 
+/// Whether files opened together become tabs in one window (macOS). On unless turned off.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub fn batch_tabs(app: &AppHandle) -> bool {
+    read(app).get("batchTabs").and_then(|v| v.as_bool()).unwrap_or(true)
+}
+
 #[tauri::command]
 pub fn get_remote_content(app: AppHandle) -> bool {
     remote_content(&app)

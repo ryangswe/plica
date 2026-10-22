@@ -152,6 +152,22 @@
         "description": "Mermaid diagram",
         "role": "Viewer",
         "mimeType": "text/vnd.mermaid"
+      },
+      {
+        "ext": [
+          "txt",
+          "text"
+        ],
+        "contentTypes": [
+          "public.plain-text",
+          "public.source-code",
+          "public.script"
+        ],
+        "name": "Text file",
+        "description": "Plain text or source code",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "mimeType": "text/plain"
       }
     ],
     "linux": {

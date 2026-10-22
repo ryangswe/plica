@@ -194,9 +194,10 @@ export async function createTauriHost(): Promise<Host> {
         else if (p.type === "leave") dragging(false);
         else if (p.type === "drop") {
           dragging(false);
-          const [first, ...rest] = p.paths;
-          if (first) openPath(first);
-          for (const extra of rest) invoke("open_window", { path: extra }).catch((err) => error(String(err)));
+          // One file opens here; several files or a folder open as a batch (tabs on macOS).
+          invoke<string | null>("open_dropped", { paths: p.paths })
+            .then((single) => single && openPath(single))
+            .catch((err) => error(String(err)));
         }
       });
       const initial = await invoke<string | null>("take_initial_file");

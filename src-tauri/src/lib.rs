@@ -18,6 +18,7 @@ use std::{
 
 #[cfg(target_os = "macos")]
 mod chrome;
+mod batch;
 mod defaults;
 mod encoding;
 mod files;
@@ -218,51 +219,98 @@ fn window_showing(windows: &HashMap<String, WindowState>, path: &Path) -> Option
         .min()
 }
 
-/// Open each path: bring its window forward if it is already open (like Preview),
-/// otherwise reuse an empty window if there is one (e.g. the window macOS
-/// launched us with before telling us which file), otherwise make a new window.
+/// Open one file: bring its window forward if it's already open (like Preview), otherwise reuse an
+/// empty window if there is one (e.g. the window macOS launched us with before saying which file),
+/// otherwise make a new window. Returns the window it went into, unless it was already open.
+fn open_one(app: &AppHandle, path: PathBuf) -> Option<String> {
+    let existing = window_showing(&app.state::<AppState>().windows.lock().unwrap(), &path);
+    if let Some(w) = existing.and_then(|label| app.get_webview_window(&label)) {
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return None;
+    }
+    let reuse = {
+        let state = app.state::<AppState>();
+        let mut windows = state.windows.lock().unwrap();
+        let empty = windows
+            .iter()
+            .filter(|(_, w)| w.current.is_none() && w.pending.is_none())
+            .map(|(label, _)| label.clone())
+            .min();
+        empty.map(|label| {
+            let w = windows.get_mut(&label).unwrap();
+            w.current = Some(path.clone());
+            if !w.ready {
+                w.pending = Some(path.clone());
+            }
+            (label, w.ready)
+        })
+    };
+    match reuse {
+        Some((label, true)) => {
+            let _ = app.emit_to(EventTarget::webview_window(label.clone()), "open-path", path.to_string_lossy().into_owned());
+            if let Some(w) = app.get_webview_window(&label) {
+                let _ = w.set_focus();
+            }
+            Some(label)
+        }
+        Some((label, false)) => Some(label), // the frontend picks it up via take_initial_file
+        None => create_window(app, Some(path)).map_err(|e| eprintln!("failed to open window: {e}")).ok(),
+    }
+}
+
+/// Open each path in its own window (or the one already showing it).
 fn open_paths(app: &AppHandle, paths: Vec<PathBuf>) {
     for path in paths {
-        let existing = window_showing(&app.state::<AppState>().windows.lock().unwrap(), &path);
-        if let Some(w) = existing.and_then(|label| app.get_webview_window(&label)) {
-            let _ = w.unminimize();
-            let _ = w.set_focus();
-            continue;
+        open_one(app, path);
+    }
+}
+
+/// Open files for a batch; returns the windows they went into, in order (already-open ones excluded).
+fn open_files_in_windows(app: &AppHandle, files: Vec<PathBuf>) -> Vec<String> {
+    files.into_iter().filter_map(|p| open_one(app, p)).collect()
+}
+
+/// Several paths or a folder go through `batch` (tabs, skipping binaries); one file opens as usual.
+fn open_any(app: &AppHandle, paths: Vec<PathBuf>) {
+    match paths.as_slice() {
+        [one] if one.is_file() => open_paths(app, paths),
+        [] => {}
+        _ => batch::open(app, paths),
+    }
+}
+
+/// Show a short message in a window: right away if it's loaded, else once it is. Without a window,
+/// in the focused one, or a new empty one.
+fn notify(app: &AppHandle, label: Option<&str>, msg: &str) {
+    let label = label.map(str::to_string).or_else(|| {
+        app.webview_windows().into_iter().find(|(_, w)| w.is_focused().unwrap_or(false)).map(|(l, _)| l)
+    });
+    let Some(label) = label.or_else(|| create_window(app, None).ok()) else { return };
+    let ready = {
+        let state = app.state::<AppState>();
+        let mut windows = state.windows.lock().unwrap();
+        let Some(w) = windows.get_mut(&label) else { return };
+        if !w.ready {
+            w.pending_command = Some(format!("notice:{msg}"));
         }
-        let reuse = {
-            let state = app.state::<AppState>();
-            let mut windows = state.windows.lock().unwrap();
-            let empty = windows
-                .iter()
-                .filter(|(_, w)| w.current.is_none() && w.pending.is_none())
-                .map(|(label, _)| label.clone())
-                .min();
-            empty.map(|label| {
-                let w = windows.get_mut(&label).unwrap();
-                w.current = Some(path.clone());
-                if !w.ready {
-                    w.pending = Some(path.clone());
-                }
-                (label, w.ready)
-            })
-        };
-        match reuse {
-            Some((label, true)) => {
-                let _ = app.emit_to(
-                    EventTarget::webview_window(label.clone()),
-                    "open-path",
-                    path.to_string_lossy().into_owned(),
-                );
-                if let Some(w) = app.get_webview_window(&label) {
-                    let _ = w.set_focus();
-                }
-            }
-            Some((_, false)) => {} // frontend will pick it up via take_initial_file
-            None => {
-                if let Err(e) = create_window(app, Some(path)) {
-                    eprintln!("failed to open window: {e}");
-                }
-            }
+        w.ready
+    };
+    if ready {
+        let _ = app.emit_to(EventTarget::webview_window(label), "notice", msg.to_string());
+    }
+}
+
+/// Files dropped on a window: one file opens right there (returned to the page); several files or a
+/// folder open as a batch.
+#[tauri::command]
+fn open_dropped(app: AppHandle, paths: Vec<String>) -> Option<String> {
+    let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    match paths.as_slice() {
+        [one] if one.is_file() => Some(one.to_string_lossy().into_owned()),
+        _ => {
+            batch::open(&app, paths);
+            None
         }
     }
 }
@@ -281,7 +329,7 @@ fn startup_windows(cli_paths: Vec<PathBuf>, already_open: usize) -> Vec<Option<P
     }
 }
 
-/// File arguments from a command line (skipping flags), resolved against `cwd`.
+/// File and folder arguments from a command line (skipping flags), resolved against `cwd`.
 fn paths_from_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<PathBuf> {
     args.into_iter()
         .filter(|a| !a.starts_with('-'))
@@ -293,7 +341,7 @@ fn paths_from_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<Pa
                 cwd.join(p)
             }
         })
-        .filter(|p| p.is_file())
+        .filter(|p| p.is_file() || p.is_dir())
         .collect()
 }
 
@@ -314,7 +362,7 @@ pub fn run() {
         if paths.is_empty() {
             let _ = create_window(app, None);
         } else {
-            open_paths(app, paths);
+            open_any(app, paths);
         }
     }));
 
@@ -335,7 +383,8 @@ pub fn run() {
             defaults::set_default_apps,
             defaults::default_apps_prompt_dismissed,
             defaults::dismiss_default_apps_prompt,
-            resend_window_chrome
+            resend_window_chrome,
+            open_dropped
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
@@ -348,6 +397,11 @@ pub fn run() {
             chrome::start(app.handle());
             let cwd = std::env::current_dir().unwrap_or_default();
             let paths = paths_from_args(std::env::args().skip(1), &cwd);
+            // Several files or a folder on the command line: one batch (tabs on macOS).
+            if paths.len() > 1 || paths.iter().any(|p| p.is_dir()) {
+                batch::open(app.handle(), paths);
+                return Ok(());
+            }
             let already_open = app.state::<AppState>().windows.lock().unwrap().len();
             for path in startup_windows(paths, already_open) {
                 create_window(app.handle(), path)?;
@@ -362,8 +416,9 @@ pub fn run() {
         match _event {
             // Finder "Open" / double-click arrives as an event, not as arguments.
             tauri::RunEvent::Opened { urls } => {
+                // Several files (Finder multi-select, Dock drop) or a folder open as one batch.
                 let paths = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
-                open_paths(_app, paths);
+                open_any(_app, paths);
             }
             // Like Preview: closing the last window keeps the app running, so the next file opens
             // warm (~190 ms vs ~510 ms cold). `code: None` only happens when the last window
@@ -430,7 +485,8 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("plica-test-args-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         File::create(dir.join("x.md")).unwrap();
-        let got = paths_from_args(vec!["--flag".into(), "x.md".into(), "nope.md".into()], &dir);
-        assert_eq!(got, vec![dir.join("x.md")]);
+        std::fs::create_dir_all(dir.join("docs")).unwrap();
+        let got = paths_from_args(vec!["--flag".into(), "x.md".into(), "nope.md".into(), "docs".into()], &dir);
+        assert_eq!(got, vec![dir.join("x.md"), dir.join("docs")]); // folders open as a batch
     }
 }

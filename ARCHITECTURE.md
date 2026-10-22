@@ -19,6 +19,7 @@ src/                     web frontend (TypeScript, no framework, Vite)
 src-tauri/
   src/lib.rs             windows, OS open events, watching, macOS tabs, startup
   src/files.rs           reading files for the frontend (size cap, binary, encodings); which watch events matter
+  src/batch.rs           several files / a folder at once: name order, skip binaries, tabs on macOS
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
   src/defaults.rs        which app opens each file type; make Plica the default (macOS: NSWorkspace + UTType)
   src/chrome.rs          macOS: tells each window when the tab bar shows or it goes full screen (the toolbar

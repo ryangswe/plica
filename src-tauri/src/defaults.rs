@@ -191,6 +191,8 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
+            // "Alternate" entries only put Plica in Open With (plain text, code); never offered as default.
+            .filter(|a| a["rank"] != "Alternate")
             .flat_map(|a| a["ext"].as_array().unwrap().iter().map(|e| e.as_str().unwrap().to_string()))
             .collect();
         let mut ours: Vec<String> = TYPES.iter().flat_map(|(_, _, exts)| exts.iter().map(|e| e.to_string())).collect();

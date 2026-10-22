@@ -65,6 +65,15 @@ pub fn read_file(path: String, encoding: Option<String>) -> Result<FileData, Str
     Ok(data)
 }
 
+/// Whether a file looks binary (judged from its first 8 KB, like `read_file`): batches skip those.
+pub fn looks_binary(path: &Path) -> bool {
+    let mut head = Vec::with_capacity(8000);
+    match File::open(path).and_then(|f| f.take(8000).read_to_end(&mut head)) {
+        Ok(_) => decode_text(&head).is_none(),
+        Err(_) => true, // unreadable: nothing to show either
+    }
+}
+
 /// Whether a watcher event in the file's folder is about the file. Removals count too, so the
 /// frontend re-reads and can tell the user the file is gone instead of silently showing old content.
 pub fn concerns_file(event: &notify::Event, file_name: &std::ffi::OsStr) -> bool {

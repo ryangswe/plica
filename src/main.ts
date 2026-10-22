@@ -350,6 +350,7 @@ function reopenWithEncoding(label: string) {
 /** Commands from the native menu bar (macOS). */
 function runCommand(id: string) {
   if (id.startsWith("encoding:")) return reopenWithEncoding(id.slice("encoding:".length));
+  if (id.startsWith("notice:")) return showToast(id.slice("notice:".length), 5000);
   if (id === "toggle-raw") setMode(mode === "raw" ? "rendered" : "raw");
   else if (id === "reload" && doc?.path) void openPath(doc.path, { pushHistory: false });
   else if (id === "back") goBack();
