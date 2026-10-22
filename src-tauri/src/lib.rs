@@ -128,6 +128,7 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
     let mut windows = state.windows.lock().unwrap();
     let entry = windows.entry(window.label().to_string()).or_default();
     // Browsing a folder's files: the folder is in Open Recent already, not each file.
+    #[cfg(target_os = "macos")]
     let in_folder = entry.list.as_ref().is_some_and(|l| l.folder.is_some() && l.files.contains(&target));
     entry.current = Some(target);
     entry.watcher = Some(watcher); // drops (stops) the previous watcher
@@ -143,6 +144,7 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
 
 /// Which tab Cmd+`n` selects in a group of `count` tabs: 1–8 by position, 9 is the last one
 /// (same as Safari and Terminal).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn tab_index(n: usize, count: usize) -> Option<usize> {
     match n {
         9 if count > 0 => Some(count - 1),
