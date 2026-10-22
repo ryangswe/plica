@@ -1,6 +1,7 @@
 import type { DefaultAppsInfo, SetResult } from "./defaults";
 import { decodeBytes } from "./lib/decode";
 import type { FileDoc } from "./types";
+import { sortByName, type FileList, type ListItem } from "./sidebar";
 
 /**
  * Everything platform-specific lives behind this interface. The desktop app
@@ -13,6 +14,9 @@ export interface Host {
   init(handlers: {
     open(doc: FileDoc): void;
     openPath(path: string): void;
+    /** A folder or several files opened together: list them in the sidebar. `showFirst` false when the
+     * host opens the first file itself (desktop: an "open-path" follows). */
+    list(list: FileList, showFirst?: boolean): void;
     error(msg: string): void;
     dragging(on: boolean): void;
     /** A native menu command (macOS menu bar), e.g. "toggle-raw", "find", "copy-path". */
@@ -67,6 +71,15 @@ export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+/** Several dropped or picked files (browser): a list, text files only, sorted by name. */
+async function filesToList(files: File[]): Promise<FileList | null> {
+  const docs = await Promise.all(files.map(fileToDoc));
+  const text = docs.filter((d) => !d.binary);
+  if (!text.length) return null;
+  const items: ListItem[] = sortByName(text).map((d, i) => ({ key: `upload:${i}:${d.name}`, name: d.name, path: null, load: async () => d }));
+  return { title: "Files", items };
+}
+
 async function fileToDoc(file: File): Promise<FileDoc> {
   const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()));
   return {
@@ -84,6 +97,7 @@ export function createBrowserHost(): Host {
   const input = document.createElement("input");
   input.type = "file";
   input.hidden = true;
+  input.multiple = true;
   input.id = "file-picker";
   document.body.append(input);
   return {
@@ -119,11 +133,21 @@ export function createBrowserHost(): Host {
       }
       remoteChanged?.(allowed);
     },
-    async init({ open, dragging, remoteContent }) {
+    async init({ open, list, error, dragging, remoteContent }) {
       remoteChanged = remoteContent;
+      const openFiles = async (files: File[]) => {
+        try {
+          if (files.length === 1) return open(await fileToDoc(files[0]));
+          if (!files.length) return;
+          const l = await filesToList(files);
+          if (l) list(l);
+          else error("Nothing to show: Plica opens text files only.");
+        } catch {
+          error("Couldn't read that. Folders open in the desktop app."); // a dropped folder isn't readable here
+        }
+      };
       input.addEventListener("change", async () => {
-        const f = input.files?.[0];
-        if (f) open(await fileToDoc(f));
+        await openFiles([...(input.files ?? [])]);
         input.value = "";
       });
       let depth = 0;
@@ -139,8 +163,7 @@ export function createBrowserHost(): Host {
         e.preventDefault();
         depth = 0;
         dragging(false);
-        const f = e.dataTransfer?.files?.[0];
-        if (f) open(await fileToDoc(f));
+        await openFiles([...(e.dataTransfer?.files ?? [])]);
       });
     },
     async pickFile() {
@@ -180,10 +203,16 @@ export async function createTauriHost(): Promise<Host> {
     kind: "tauri",
     canReadPaths: true,
     nativeMenu: /Mac/.test(navigator.platform),
-    async init({ openPath, error, dragging, command, notice, remoteContent, chrome }) {
+    async init({ openPath, list, error, dragging, command, notice, remoteContent, chrome }) {
       await win.listen<{ tabBarInset: number; fullscreen: boolean }>("window-chrome", (e) => chrome(e.payload));
       invoke("resend_window_chrome").catch(() => {}); // macOS only; the first report may predate us
       await win.listen<string>("open-path", (e) => openPath(e.payload));
+      const toList = (p: { title: string; items: { name: string; path: string }[] }): FileList => ({
+        title: p.title,
+        items: p.items.map((i) => ({ key: i.path, name: i.name, path: i.path })),
+      });
+      // Sent before the "open-path" for its first file.
+      await win.listen<{ title: string; items: { name: string; path: string }[] }>("file-list", (e) => list(toList(e.payload), false));
       await listen<boolean>("remote-content", (e) => remoteContent(e.payload)); // app-wide broadcast
       await win.listen<string>("menu", (e) => command(e.payload));
       await win.listen<string>("notice", (e) => notice(e.payload));
@@ -194,12 +223,14 @@ export async function createTauriHost(): Promise<Host> {
         else if (p.type === "leave") dragging(false);
         else if (p.type === "drop") {
           dragging(false);
-          // One file opens here; several files or a folder open as a batch (tabs on macOS).
+          // One file opens here; several files or a folder become this window's file list.
           invoke<string | null>("open_dropped", { paths: p.paths })
             .then((single) => single && openPath(single))
             .catch((err) => error(String(err)));
         }
       });
+      const initialList = await invoke<{ title: string; items: { name: string; path: string }[] } | null>("file_list").catch(() => null);
+      if (initialList) list(toList(initialList), false);
       const initial = await invoke<string | null>("take_initial_file");
       if (initial) openPath(initial);
     },

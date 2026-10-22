@@ -2,7 +2,8 @@
 //!
 //! Responsibilities (everything else lives in the web frontend):
 //! - figure out which file(s) the OS asked us to open (CLI args, macOS "open" events,
-//!   a second launch on Windows/Linux) and give each its own window
+//!   a second launch on Windows/Linux) and give each its own window; a folder or several files
+//!   opened together share one window with a file list (batch.rs)
 //! - read files from disk for the frontend (files.rs, encoding.rs)
 //! - watch the open file and tell its window when it changes
 //! - macOS menu bar, window chrome, default apps, settings (menu.rs, chrome.rs, defaults.rs, settings.rs)
@@ -39,6 +40,8 @@ struct WindowState {
     ready: bool,
     /// A menu command to run once the window has loaded (it was opened for that command).
     pending_command: Option<String>,
+    /// The folder or group of files listed in the window's sidebar.
+    list: Option<batch::FileList>,
     watcher: Option<RecommendedWatcher>,
 }
 
@@ -74,6 +77,12 @@ fn open_window_for_command(app: &AppHandle, command: &str) {
         }
         Err(e) => eprintln!("failed to open window: {e}"),
     }
+}
+
+/// The window's file list (sidebar), if it has one. Asked for before `take_initial_file`.
+#[tauri::command]
+fn file_list(window: WebviewWindow, state: State<AppState>) -> Option<batch::ListPayload> {
+    state.windows.lock().unwrap().get(window.label())?.list.as_ref().map(batch::FileList::payload)
 }
 
 /// Called once by each window's frontend after it has set up its event listeners.
@@ -114,11 +123,13 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
 
     let mut windows = state.windows.lock().unwrap();
     let entry = windows.entry(window.label().to_string()).or_default();
+    // Browsing a folder's files: the folder is in Open Recent already, not each file.
+    let in_folder = entry.list.as_ref().is_some_and(|l| l.folder.is_some() && l.files.contains(&target));
     entry.current = Some(target);
     entry.watcher = Some(watcher); // drops (stops) the previous watcher
     drop(windows);
     #[cfg(target_os = "macos")]
-    {
+    if !in_folder {
         let recent = PathBuf::from(&path);
         let app = window.app_handle().clone();
         let _ = window.run_on_main_thread(move || menu::note_recent(&app, &recent));
@@ -172,6 +183,10 @@ fn current_file(app: &AppHandle, label: &str) -> Option<PathBuf> {
 
 /// Create a window (showing `path`, or empty) and return its label.
 fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String> {
+    create_window_with(app, path, None)
+}
+
+fn create_window_with(app: &AppHandle, path: Option<PathBuf>, list: Option<batch::FileList>) -> tauri::Result<String> {
     let state = app.state::<AppState>();
     let n = state.counter.fetch_add(1, Ordering::SeqCst);
     let label = format!("w{n}");
@@ -180,6 +195,7 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String
         WindowState {
             current: path.clone(),
             pending: path,
+            list,
             ..Default::default()
         },
     );
@@ -208,9 +224,12 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String
     Ok(label)
 }
 
+fn canon(p: &Path) -> PathBuf {
+    std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+}
+
 /// The window already showing `path`, if any (compared after resolving symlinks and `..`).
 fn window_showing(windows: &HashMap<String, WindowState>, path: &Path) -> Option<String> {
-    let canon = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
     let target = canon(path);
     windows
         .iter()
@@ -266,17 +285,85 @@ fn open_paths(app: &AppHandle, paths: Vec<PathBuf>) {
     }
 }
 
-/// Open files for a batch; returns the windows they went into, in order (already-open ones excluded).
-fn open_files_in_windows(app: &AppHandle, files: Vec<PathBuf>) -> Vec<String> {
-    files.into_iter().filter_map(|p| open_one(app, p)).collect()
+/// The window whose file list has `path` (a file) or is the same list (same folder or files).
+fn window_listing(windows: &HashMap<String, WindowState>, path: Option<&Path>, same_as: Option<&batch::FileList>) -> Option<String> {
+    windows
+        .iter()
+        .filter(|(_, w)| {
+            let Some(list) = &w.list else { return false };
+            path.is_some_and(|p| list.files.iter().any(|f| canon(f) == canon(p))) || same_as.is_some_and(|other| list.same_as(other))
+        })
+        .map(|(label, _)| label.clone())
+        .min()
 }
 
-/// Several paths or a folder go through `batch` (tabs, skipping binaries); one file opens as usual.
+/// Show `path` in window `label` (now if it has loaded, else once it does) and bring it forward.
+fn show_in(app: &AppHandle, label: &str, path: PathBuf) {
+    let ready = {
+        let state = app.state::<AppState>();
+        let mut windows = state.windows.lock().unwrap();
+        let Some(w) = windows.get_mut(label) else { return };
+        w.current = Some(path.clone());
+        if !w.ready {
+            w.pending = Some(path.clone());
+        }
+        w.ready
+    };
+    if ready {
+        let _ = app.emit_to(EventTarget::webview_window(label), "open-path", path.to_string_lossy().into_owned());
+    }
+    if let Some(w) = app.get_webview_window(label) {
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// Give a window this file list (or a new window, when `target` is None and no window has it yet) and
+/// show its first file. Returns the window.
+fn open_list(app: &AppHandle, list: batch::FileList, target: Option<String>) -> Option<String> {
+    let first = list.files.first()?.clone();
+    // This window, else one that already lists the same folder, else an empty one.
+    let existing = target.or_else(|| {
+        let state = app.state::<AppState>();
+        let windows = state.windows.lock().unwrap();
+        window_listing(&windows, None, Some(&list)).or_else(|| {
+            windows.iter().filter(|(_, w)| w.current.is_none() && w.pending.is_none() && w.list.is_none()).map(|(l, _)| l.clone()).min()
+        })
+    });
+    let Some(label) = existing else {
+        return create_window_with(app, Some(first), Some(list)).map_err(|e| eprintln!("failed to open window: {e}")).ok();
+    };
+    let payload = list.payload();
+    let ready = {
+        let state = app.state::<AppState>();
+        let mut windows = state.windows.lock().unwrap();
+        let w = windows.get_mut(&label)?;
+        w.list = Some(list);
+        w.ready
+    };
+    if ready {
+        let _ = app.emit_to(EventTarget::webview_window(label.clone()), "file-list", payload);
+    }
+    show_in(app, &label, first);
+    Some(label)
+}
+
+/// Files the OS asked us to open. Several paths or a folder go through `batch` (one window with a
+/// file list, skipping binaries). One file opens in its own window, or in the window that lists it.
 fn open_any(app: &AppHandle, paths: Vec<PathBuf>) {
     match paths.as_slice() {
-        [one] if one.is_file() => open_paths(app, paths),
+        [one] if one.is_file() => {
+            let windows = app.state::<AppState>();
+            let windows = windows.windows.lock().unwrap();
+            let listed = window_showing(&windows, one).is_none().then(|| window_listing(&windows, Some(one), None)).flatten();
+            drop(windows);
+            match listed {
+                Some(label) => show_in(app, &label, one.clone()),
+                None => open_paths(app, paths),
+            }
+        }
         [] => {}
-        _ => batch::open(app, paths),
+        _ => batch::open(app, paths, None),
     }
 }
 
@@ -302,14 +389,14 @@ fn notify(app: &AppHandle, label: Option<&str>, msg: &str) {
 }
 
 /// Files dropped on a window: one file opens right there (returned to the page); several files or a
-/// folder open as a batch.
+/// folder become this window's file list.
 #[tauri::command]
-fn open_dropped(app: AppHandle, paths: Vec<String>) -> Option<String> {
+fn open_dropped(window: WebviewWindow, paths: Vec<String>) -> Option<String> {
     let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
     match paths.as_slice() {
         [one] if one.is_file() => Some(one.to_string_lossy().into_owned()),
         _ => {
-            batch::open(&app, paths);
+            batch::open(window.app_handle(), paths, Some(window.label().to_string()));
             None
         }
     }
@@ -373,6 +460,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             files::read_file,
             take_initial_file,
+            file_list,
             take_pending_command,
             watch_file,
             open_window,
@@ -397,9 +485,9 @@ pub fn run() {
             chrome::start(app.handle());
             let cwd = std::env::current_dir().unwrap_or_default();
             let paths = paths_from_args(std::env::args().skip(1), &cwd);
-            // Several files or a folder on the command line: one batch (tabs on macOS).
+            // Several files or a folder on the command line: one window with a file list.
             if paths.len() > 1 || paths.iter().any(|p| p.is_dir()) {
-                batch::open(app.handle(), paths);
+                batch::open(app.handle(), paths, None);
                 return Ok(());
             }
             let already_open = app.state::<AppState>().windows.lock().unwrap().len();

@@ -75,41 +75,6 @@ fn check(app: &AppHandle) {
     }
 }
 
-/// Put these windows into one native tab group, in this order, and bring the first tab forward.
-pub fn group_as_tabs(app: &AppHandle, labels: &[String]) {
-    let windows: Vec<&NSWindow> = labels
-        .iter()
-        .filter_map(|l| app.get_webview_window(l)?.ns_window().ok())
-        // SAFETY: live NSWindows from Tauri; this runs on the main thread.
-        .map(|ptr| unsafe { &*(ptr as *const NSWindow) })
-        .collect();
-    for pair in windows.windows(2) {
-        // Each one right after the previous, so the tabs keep the batch order.
-        pair[0].addTabbedWindow_ordered(pair[1], objc2_app_kit::NSWindowOrderingMode::Above);
-    }
-    select_first(app, labels);
-    // New windows come forward as they finish appearing, after this runs: select the first tab again
-    // once they have.
-    let (app, labels) = (app.clone(), labels.to_vec());
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(400));
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || select_first(&handle, &labels));
-    });
-}
-
-fn select_first(app: &AppHandle, labels: &[String]) {
-    let Some(ptr) = labels.first().and_then(|l| app.get_webview_window(l)).and_then(|w| w.ns_window().ok()) else {
-        return;
-    };
-    // SAFETY: live NSWindow from Tauri; main thread.
-    let first = unsafe { &*(ptr as *const NSWindow) };
-    if let Some(group) = first.tabGroup() {
-        group.setSelectedWindow(Some(first));
-    }
-    first.makeKeyAndOrderFront(None);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

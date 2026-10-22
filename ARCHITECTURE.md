@@ -11,6 +11,7 @@ src/                     web frontend (TypeScript, no framework, Vite)
   host.ts                platform layer: Tauri host (desktop) vs browser host (dev/tests/web demo)
   defaults.ts            the Default Apps window
   find.ts                find-in-page bar (matches across formatting; points to Raw for off-screen matches)
+  sidebar.ts             file list of a folder or of files opened together (click or arrow keys to show one)
   types.ts               FileDoc, Renderer, RenderContext
   renderers/             one file per type + index.ts registry (first match wins, codeRenderer is fallback)
     raw.ts               line-numbered highlighted source (used for every Raw view)
@@ -19,13 +20,14 @@ src/                     web frontend (TypeScript, no framework, Vite)
 src-tauri/
   src/lib.rs             windows, OS open events, watching, macOS tabs, startup
   src/files.rs           reading files for the frontend (size cap, binary, encodings); which watch events matter
-  src/batch.rs           several files / a folder at once: name order, skip binaries, tabs on macOS
+  src/batch.rs           several files / a folder at once: name order, skip binaries; one window whose
+                         file list the frontend shows in its sidebar (src/sidebar.ts)
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
   src/defaults.rs        which app opens each file type; make Plica the default (macOS: NSWorkspace + UTType)
   src/chrome.rs          macOS: tells each window when the tab bar shows or it goes full screen (the toolbar
                          is drawn in the transparent title bar)
   src/settings.rs        settings.json (editor, recent files, remote images, prompts)
-  src/menu.rs            macOS menu bar, Open Recent (AppKit-managed), Open in Editor; commands the
+  src/menu.rs            macOS menu bar, Open Recent (Plica's own list), Open in Editor; commands the
                          frontend owns are sent to the focused window as `menu` events
   tauri.conf.json        CSP, asset protocol, file associations, bundle settings
   capabilities/          permissions granted to windows (labels w0, w1, ...)

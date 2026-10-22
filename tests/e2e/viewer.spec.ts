@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 
 const FIX = path.resolve("tests/fixtures");
 let SHOTS = "";
@@ -290,6 +291,33 @@ test("dark mode", async ({ browser }) => {
   await open(page, "app.log");
   await page.screenshot({ path: `${SHOTS}/11-log-dark.png` });
   await ctx.close();
+});
+
+test("several files open with a file list on the left", async ({ page }) => {
+  // Picked in a jumbled order, with one file that isn't text: listed by name, text files only.
+  const file = (name: string) => ({ name, mimeType: "text/plain", buffer: readFileSync(path.join(FIX, name)) });
+  const logo = { name: "logo.png", mimeType: "image/png", buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0x0d, 0, 1, 2]) };
+  await page.locator("#file-picker").setInputFiles([file("package.json"), file("sample.md"), logo, file("data.csv")]);
+  const items = page.locator(".sidebar-item");
+  await expect(items).toHaveText(["data.csv", "package.json", "sample.md"]);
+  await expect(page.locator(".file-name")).toHaveText("data.csv");
+  await expect(items.nth(0)).toHaveAttribute("aria-current", "true");
+  await page.screenshot({ path: `${SHOTS}/22-sidebar.png` });
+
+  await items.nth(2).click();
+  await expect(page.locator(".file-name")).toHaveText("sample.md");
+  await expect(page.locator(".markdown-body h1")).toContainText("Plica sample");
+  await expect(items.nth(2)).toHaveAttribute("aria-current", "true");
+  // Arrow keys move through the list and show each file.
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".file-name")).toHaveText("package.json");
+
+  // The toolbar button and the shortcut hide and show the list.
+  const sidebar = page.locator(".sidebar");
+  await page.locator(".sidebar-btn").click();
+  await expect(sidebar).toBeHidden();
+  await page.keyboard.press(process.platform === "darwin" ? "Control+Meta+KeyS" : "Control+KeyB");
+  await expect(sidebar).toBeVisible();
 });
 
 test("narrow window stays usable", async ({ page }) => {

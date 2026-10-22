@@ -16,6 +16,7 @@ import { countRemoteRefs } from "../../src/renderers/simple";
 import { pickRenderer } from "../../src/renderers";
 import { renderRaw } from "../../src/renderers/raw";
 import type { FileDoc, RenderContext } from "../../src/types";
+import { createSidebar, sortByName, type ListItem } from "../../src/sidebar";
 
 const fixture = (name: string) => readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8");
 const doc = (name: string, text = fixture(name)): FileDoc => ({ path: `/tmp/fx/${name}`, name, text, size: text.length, binary: false, truncated: false, encoding: "UTF-8" });
@@ -420,5 +421,41 @@ describe("polish", () => {
   it("says the notebook kernel is the saved one, not a running one", async () => {
     const out = (await notebookRenderer.render!(doc("notebook.ipynb"), ctx())) as HTMLElement;
     expect(out.querySelector(".nb-kernel")?.textContent).toBe("Saved kernel: Python 3");
+  });
+});
+
+describe("sidebar", () => {
+  it("sorts names like Finder: case-insensitive, numbers by value", () => {
+    const names = sortByName(["b.md", "10 faq.md", "README", "2 setup.md", "a.md", "1 intro.md"].map((name) => ({ name }))).map((x) => x.name);
+    expect(names).toEqual(["1 intro.md", "2 setup.md", "10 faq.md", "a.md", "b.md", "README"]);
+  });
+
+  it("lists files, marks the shown one, and moves with the arrow keys", () => {
+    const picked: string[] = [];
+    const opened: boolean[] = [];
+    const sb = createSidebar((item) => picked.push(item.key), (open) => opened.push(open));
+    document.body.append(sb.el);
+    const items: ListItem[] = ["/d/a.md", "/d/b.md", "/d/c.md"].map((p) => ({ key: p, name: p.slice(3), path: p }));
+    sb.setList({ title: "d", items });
+    expect(sb.el.querySelector(".sidebar-title")!.textContent).toBe("d");
+    expect(sb.el.querySelector(".sidebar-count")!.textContent).toBe("3");
+    expect(sb.isOpen()).toBe(false);
+    sb.setOpen(true);
+    expect(opened).toEqual([true]);
+
+    sb.markCurrent("/d/b.md");
+    const buttons = [...sb.el.querySelectorAll<HTMLButtonElement>(".sidebar-item")];
+    expect(buttons.map((b) => b.getAttribute("aria-current"))).toEqual([null, "true", null]);
+    expect(buttons.map((b) => b.tabIndex)).toEqual([-1, 0, -1]); // one Tab stop: the shown file
+
+    buttons[0].click();
+    buttons[1].focus();
+    buttons[1].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    buttons[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); // last: stays
+    expect(picked).toEqual(["/d/a.md", "/d/c.md"]);
+
+    sb.markCurrent("/elsewhere.md"); // a linked file outside the list
+    expect(sb.el.querySelectorAll("[aria-current]").length).toBe(0);
+    sb.el.remove();
   });
 });

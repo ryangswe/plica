@@ -23,7 +23,7 @@ use tauri_plugin_dialog::DialogExt;
 
 /// Menu ids forwarded unchanged to the focused window's frontend.
 const FRONTEND_COMMANDS: &[&str] =
-    &["toggle-raw", "reload", "back", "copy-source", "copy-path", "find", "find-next", "find-prev", "default-apps"];
+    &["toggle-raw", "toggle-sidebar", "reload", "back", "copy-source", "copy-path", "find", "find-next", "find-prev", "default-apps"];
 
 /// Encodings offered in File → Reopen with Encoding: (WHATWG label, menu text).
 const ENCODINGS: &[(&str, &str)] = &[
@@ -109,9 +109,6 @@ pub fn recent_labels(list: &[PathBuf]) -> Vec<String> {
         })
         .collect()
 }
-
-/// Window → Open Multiple Files as Tabs.
-struct BatchTabsToggle(CheckMenuItem<Wry>);
 
 /// View → Load Remote Images.
 struct RemoteToggle(CheckMenuItem<Wry>);
@@ -200,7 +197,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let reopen_with = reopen_with.build()?;
     let file = SubmenuBuilder::new(app, "File")
         .item(&MenuItemBuilder::with_id("open", "Open…").accelerator("CmdOrCtrl+O").build(app)?)
-        .item(&MenuItemBuilder::with_id("open-folder", "Open Folder as Tabs…").accelerator("CmdOrCtrl+Shift+O").build(app)?)
+        .item(&MenuItemBuilder::with_id("open-folder", "Open Folder…").accelerator("CmdOrCtrl+Shift+O").build(app)?)
         .item(&open_recent)
         .separator()
         .item(&open_in)
@@ -235,6 +232,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     app.manage(RemoteToggle(remote_toggle.clone()));
     let view = SubmenuBuilder::new(app, "View")
         .item(&MenuItemBuilder::with_id("toggle-raw", "Toggle Preview / Raw").accelerator("CmdOrCtrl+/").build(app)?)
+        // The file list of a folder or of files opened together. ⌃⌘S is the usual Mac sidebar shortcut.
+        .item(&MenuItemBuilder::with_id("toggle-sidebar", "Toggle Sidebar").accelerator("Ctrl+Super+S").build(app)?)
         .item(&MenuItemBuilder::with_id("reload", "Reload").accelerator("CmdOrCtrl+R").build(app)?)
         .item(&MenuItemBuilder::with_id("back", "Back").accelerator("CmdOrCtrl+[").build(app)?)
         .separator()
@@ -245,15 +244,9 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     // The Window menu id makes Tauri register it with AppKit, which adds the window list and the tab
     // commands (Show Previous/Next Tab, Move Tab to New Window, Merge All Windows).
-    let batch_tabs = CheckMenuItemBuilder::with_id("toggle-batch-tabs", "Open Multiple Files as Tabs")
-        .checked(crate::settings::batch_tabs(app))
-        .build(app)?;
-    app.manage(BatchTabsToggle(batch_tabs.clone()));
     let window = SubmenuBuilder::with_id(app, WINDOW_SUBMENU_ID, "Window")
         .minimize()
         .maximize()
-        .separator()
-        .item(&batch_tabs)
         .separator()
         .bring_all_to_front()
         .build()?;
@@ -306,20 +299,16 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
             }
             dialog.pick_files(move |picked| {
                 let paths = picked.unwrap_or_default().into_iter().filter_map(|p| p.into_path().ok()).collect();
-                crate::open_any(&handle, paths); // several files: one window with tabs
+                crate::open_any(&handle, paths); // several files: one window with a file list
             });
         }
         "open-folder" => {
             let handle = app.clone();
-            app.dialog().file().set_title("Open Folder as Tabs").pick_folder(move |picked| {
+            app.dialog().file().set_title("Open Folder").pick_folder(move |picked| {
                 if let Some(dir) = picked.and_then(|p| p.into_path().ok()) {
-                    crate::batch::open(&handle, vec![dir]);
+                    crate::batch::open(&handle, vec![dir], None);
                 }
             });
-        }
-        "toggle-batch-tabs" => {
-            let on = app.state::<BatchTabsToggle>().0.is_checked().unwrap_or(true);
-            crate::settings::write(app, "batchTabs", serde_json::Value::Bool(on));
         }
         "reveal" => {
             if let Some((_, path)) = focused_file(app) {
@@ -353,6 +342,8 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
             let Some(path) = id[7..].parse::<usize>().ok().and_then(|i| menu.files.lock().unwrap().get(i).cloned()) else { return };
             if path.is_file() {
                 crate::open_paths(app, vec![path]);
+            } else if path.is_dir() {
+                crate::batch::open(app, vec![path], None); // a folder opened before
             } else {
                 // Moved or deleted since: drop it rather than open an error.
                 menu.files.lock().unwrap().retain(|p| *p != path);

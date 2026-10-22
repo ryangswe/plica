@@ -10,6 +10,7 @@ import { readWithRetry, staleMessage } from "./lib/reload";
 import type { RemotePolicy } from "./lib/sanitize";
 import { createFindBar } from "./find";
 import { openDefaultAppsSheet } from "./defaults";
+import { createSidebar, type FileList, type ListItem } from "./sidebar";
 
 type Mode = "rendered" | "raw";
 
@@ -19,6 +20,14 @@ const MOD = isMac ? "⌘" : "Ctrl+";
 // ---- DOM ------------------------------------------------------------------
 
 const app = document.getElementById("app")!;
+const SIDEBAR_KEY = isMac ? "⌃⌘S" : "Ctrl+B";
+const sidebarBtn = el(
+  "button",
+  { class: "icon-btn sidebar-btn", title: `Show or hide the file list (${SIDEBAR_KEY})`, "aria-label": "Sidebar", "aria-pressed": "false", hidden: "" },
+);
+// Two panes, the left one narrow: the usual "sidebar" glyph.
+sidebarBtn.innerHTML =
+  '<svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="12.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 1v12" stroke="currentColor" stroke-width="1.5"/></svg>';
 const backBtn = el("button", { class: "icon-btn", id: "back", title: "Back (Alt+←)", "aria-label": "Back", hidden: "" }, "←");
 const nameEl = el("span", { class: "file-name" }, "Plica");
 const metaEl = el("span", { class: "file-meta" });
@@ -35,7 +44,7 @@ metaEl.setAttribute("data-tauri-drag-region", "");
 const bar = el(
   "header",
   { class: "topbar", ...drag },
-  el("div", { class: "tb-left", ...drag }, backBtn, el("div", { class: "file-title", ...drag }, nameEl, metaEl)),
+  el("div", { class: "tb-left", ...drag }, sidebarBtn, backBtn, el("div", { class: "file-title", ...drag }, nameEl, metaEl)),
   el("div", { class: "tb-center", ...drag }, modeSwitch),
   el("div", { class: "tb-right", ...drag }, copyBtn, openBtn),
 );
@@ -57,7 +66,13 @@ const find = createFindBar(
 );
 // Shown only while the macOS tab bar is visible (see .titlebar-drag).
 const titlebarDrag = el("div", { class: "titlebar-drag", "data-tauri-drag-region": "", hidden: "" });
-app.append(titlebarDrag, bar, staleBar, defaultsBar, remoteBar, find.bar, view, toast, dropOverlay);
+// A folder or several files opened together: their list, on the left of the file.
+const sidebar = createSidebar(
+  (item) => void showItem(item),
+  (open) => sidebarBtn.setAttribute("aria-pressed", String(open)),
+);
+const body = el("div", { class: "body" }, sidebar.el, el("div", { class: "main-col" }, staleBar, defaultsBar, remoteBar, view));
+app.append(titlebarDrag, bar, body, find.bar, toast, dropOverlay);
 
 // ---- State ----------------------------------------------------------------
 
@@ -84,7 +99,7 @@ function emptyState(): HTMLElement {
     { class: "empty" },
     el("img", { class: "empty-mark", src: appIconUrl, alt: "", width: "72", height: "72" }),
     el("h1", {}, "Plica"),
-    el("p", {}, "Read Markdown and developer files. Drop one here, or"),
+    el("p", {}, "Read Markdown and developer files. Drop files or a folder here, or"),
     openLink,
     el("p", { class: "muted small" }, "Markdown, JSON, CSV, notebooks, logs, diffs, Mermaid and any text or code file."),
     el(
@@ -230,9 +245,10 @@ async function render(opts: { reloaded?: boolean; keepScroll?: boolean } = {}) {
     pendingAnchor = null;
   }
   find.refresh();
-  // Let arrow keys / PageDown / Space scroll right away, unless the user is typing somewhere.
+  // Let arrow keys / PageDown / Space scroll right away, unless the user is typing somewhere or
+  // browsing the file list (arrow keys move through it).
   const active = document.activeElement;
-  if (!active || active === document.body || active.tagName === "BUTTON") view.focus({ preventScroll: true });
+  if (!active || active === document.body || (active.tagName === "BUTTON" && !active.classList.contains("sidebar-item"))) view.focus({ preventScroll: true });
 }
 
 function setDoc(next: FileDoc, opts: { reloaded?: boolean; pushHistory?: boolean } = {}) {
@@ -255,6 +271,8 @@ function setDoc(next: FileDoc, opts: { reloaded?: boolean; pushHistory?: boolean
     metaEl.append(" · ", next.path && host.canReadPaths ? encodingPicker(next.encoding) : encodingLabel(next.encoding));
   }
   host.setTitle(next.name);
+  sidebar.markCurrent(next.path ?? uploadKey);
+  uploadKey = null;
   if (next.path && opts.pushHistory !== false && !samePath) history.push(next.path);
   backBtn.hidden = history.length < 2;
   if (next.path && !samePath) host.watch(next.path, onFileChanged);
@@ -277,6 +295,29 @@ async function openPath(path: string, opts: { pushHistory?: boolean; anchor?: st
   } catch (err) {
     showToast(`Couldn't open: ${String((err as Error)?.message ?? err)}`, 3500);
   }
+}
+
+/** The sidebar item being shown, for files without a path (browser uploads). */
+let uploadKey: string | null = null;
+
+async function showItem(item: ListItem) {
+  if (item.path) return openPath(item.path);
+  if (!item.load) return;
+  const next = await item.load();
+  uploadKey = item.key;
+  setDoc(next);
+}
+
+function showList(list: FileList, showFirst = true) {
+  sidebar.setList(list);
+  sidebarBtn.hidden = false;
+  sidebar.setOpen(true);
+  if (showFirst && list.items[0]) void showItem(list.items[0]);
+}
+
+function toggleSidebar() {
+  if (!sidebar.hasList()) return showToast("Open a folder or several files to list them here.", 2500);
+  sidebar.setOpen(!sidebar.isOpen());
 }
 
 let reloadTimer: number | undefined;
@@ -326,6 +367,7 @@ function goBack() {
 previewBtn.addEventListener("click", () => setMode("rendered"));
 rawBtn.addEventListener("click", () => setMode("raw"));
 openBtn.addEventListener("click", () => void pick());
+sidebarBtn.addEventListener("click", toggleSidebar);
 backBtn.addEventListener("click", goBack);
 async function copyText(text: string, done: string) {
   try {
@@ -352,6 +394,7 @@ function runCommand(id: string) {
   if (id.startsWith("encoding:")) return reopenWithEncoding(id.slice("encoding:".length));
   if (id.startsWith("notice:")) return showToast(id.slice("notice:".length), 5000);
   if (id === "toggle-raw") setMode(mode === "raw" ? "rendered" : "raw");
+  else if (id === "toggle-sidebar") toggleSidebar();
   else if (id === "reload" && doc?.path) void openPath(doc.path, { pushHistory: false });
   else if (id === "back") goBack();
   else if (id === "copy-source" && doc && !doc.binary) void copyText(doc.text, "Copied source");
@@ -393,7 +436,12 @@ document.addEventListener("keydown", (e) => {
   const mod = isMac ? e.metaKey : e.ctrlKey;
   const key = e.key.toLowerCase();
   // With a native menu bar, its items own these shortcuts: leave the keys alone so the menu gets them.
-  if (host?.nativeMenu && mod && (["/", "o", "f", "g", "r", "["].includes(key) || e.code === "Slash")) return;
+  if (host?.nativeMenu && mod && (["/", "o", "f", "g", "r", "[", "s"].includes(key) || e.code === "Slash")) return;
+  const sidebarKey = isMac ? e.metaKey && e.ctrlKey && e.code === "KeyS" : e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "KeyB";
+  if (sidebarKey) {
+    e.preventDefault();
+    return toggleSidebar();
+  }
   if (mod && key === "g") {
     e.preventDefault();
     if (doc) (e.shiftKey ? find.prev : find.next)();
@@ -463,6 +511,7 @@ async function boot() {
   await host.init({
     open: (d) => setDoc(d),
     openPath: (p) => void openPath(p),
+    list: showList,
     error: (m) => showToast(m, 3500),
     dragging: (on) => (dropOverlay.hidden = !on),
     command: runCommand,

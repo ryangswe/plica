@@ -1,11 +1,12 @@
 //! Opening several files at once (Finder multi-select, Dock drop, command line, drag and drop) and
-//! whole folders ("Open Folder as Tabs"). On macOS a batch becomes one window with a tab per file, in
-//! the order Finder lists them by name; elsewhere (no native tabs) each file gets its own window.
-//! Files Plica can't show (binary) are skipped and named in a notice.
+//! whole folders (File → Open Folder…). A batch becomes one window with the files listed in a sidebar,
+//! in the order Finder lists them by name. Files Plica can't show (binary) are skipped and named in a
+//! notice.
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
+use serde::Serialize;
 use tauri::AppHandle;
 
 /// Ask before opening more files than this at once.
@@ -19,6 +20,55 @@ pub struct Plan {
     pub skipped: Vec<PathBuf>,
     /// The folder, when the batch is one folder (for messages).
     pub folder: Option<PathBuf>,
+}
+
+/// The files a window lists in its sidebar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileList {
+    /// Set when the list is a folder's files (it goes in Open Recent, and opening it again finds it).
+    pub folder: Option<PathBuf>,
+    pub files: Vec<PathBuf>,
+}
+
+/// What the page gets: a heading and the files.
+#[derive(Serialize, Clone)]
+pub struct ListPayload {
+    title: String,
+    items: Vec<ListItem>,
+}
+
+#[derive(Serialize, Clone)]
+struct ListItem {
+    name: String,
+    path: String,
+}
+
+impl FileList {
+    /// The folder's name; for files chosen together, their folder's name when they share one.
+    pub fn title(&self) -> String {
+        if let Some(f) = &self.folder {
+            return name(f);
+        }
+        let parents: Vec<Option<&Path>> = self.files.iter().map(|f| f.parent()).collect();
+        match parents.first() {
+            Some(Some(p)) if parents.iter().all(|q| q == &Some(*p)) && !name(p).is_empty() => name(p),
+            _ => "Files".into(),
+        }
+    }
+
+    pub fn payload(&self) -> ListPayload {
+        let items = self.files.iter().map(|f| ListItem { name: name(f), path: f.to_string_lossy().into_owned() }).collect();
+        ListPayload { title: self.title(), items }
+    }
+
+    /// The same folder, or the same files.
+    pub fn same_as(&self, other: &FileList) -> bool {
+        match (&self.folder, &other.folder) {
+            (Some(a), Some(b)) => crate::canon(a) == crate::canon(b),
+            (None, None) => self.files == other.files,
+            _ => false,
+        }
+    }
 }
 
 /// Compare names the way Finder sorts by name: case-insensitive, numbers by value ("2" < "10").
@@ -74,12 +124,14 @@ pub fn folder_files(dir: &Path) -> Vec<PathBuf> {
 /// What to open for these paths: folders expand to their files; binary files are set aside.
 /// Explicitly chosen files are sorted by name too, since Finder doesn't tell us its order.
 pub fn plan(paths: &[PathBuf]) -> Plan {
-    let folder = match paths {
+    // Finder sends folders as ".../docs/": drop the trailing slash so Open Recent sees one folder.
+    let paths: Vec<PathBuf> = paths.iter().map(|p| p.components().collect()).collect();
+    let folder = match paths.as_slice() {
         [one] if one.is_dir() => Some(one.clone()),
         _ => None,
     };
     let mut candidates: Vec<PathBuf> = Vec::new();
-    for p in paths {
+    for p in &paths {
         if p.is_dir() {
             candidates.extend(folder_files(p));
         } else if p.is_file() && !candidates.contains(p) {
@@ -114,11 +166,12 @@ pub fn summary(plan: &Plan) -> Option<String> {
     ))
 }
 
-/// Open a batch (several files and/or folders). Asks first when it's a lot of files.
-pub fn open(app: &AppHandle, paths: Vec<PathBuf>) {
+/// Open a batch (several files and/or folders) in window `target`, or in a window of its own. Asks
+/// first when it's a lot of files.
+pub fn open(app: &AppHandle, paths: Vec<PathBuf>, target: Option<String>) {
     let plan = plan(&paths);
     if plan.files.len() <= CONFIRM_OVER {
-        return open_plan(app, plan);
+        return open_plan(app, plan, target);
     }
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
     let n = plan.files.len();
@@ -130,22 +183,37 @@ pub fn open(app: &AppHandle, paths: Vec<PathBuf>) {
         .buttons(MessageDialogButtons::OkCancelCustom(format!("Open {n} Files"), "Cancel".into()))
         .show(move |ok| {
             if ok {
-                open_plan(&handle, plan);
+                open_plan(&handle, plan, target);
             }
         });
 }
 
-fn open_plan(app: &AppHandle, plan: Plan) {
+fn open_plan(app: &AppHandle, plan: Plan, target: Option<String>) {
     let message = summary(&plan);
-    let labels = crate::open_files_in_windows(app, plan.files);
-    #[cfg(target_os = "macos")]
-    if crate::settings::batch_tabs(app) && labels.len() > 1 {
-        let handle = app.clone();
-        let tabs = labels.clone();
-        let _ = app.run_on_main_thread(move || crate::chrome::group_as_tabs(&handle, &tabs));
-    }
+    let label = match (&plan.folder, plan.files.as_slice()) {
+        (_, []) => target,
+        // One file chosen (plus some that aren't text): no list needed.
+        (None, [one]) => match target {
+            Some(label) => {
+                crate::show_in(app, &label, one.clone());
+                Some(label)
+            }
+            None => {
+                crate::open_paths(app, vec![one.clone()]);
+                None
+            }
+        },
+        _ => {
+            #[cfg(target_os = "macos")]
+            if let Some(folder) = plan.folder.clone() {
+                let handle = app.clone();
+                let _ = app.run_on_main_thread(move || crate::menu::note_recent(&handle, &folder));
+            }
+            crate::open_list(app, FileList { folder: plan.folder, files: plan.files }, target)
+        }
+    };
     if let Some(msg) = message {
-        crate::notify(app, labels.first().map(String::as_str), &msg);
+        crate::notify(app, label.as_deref(), &msg);
     }
 }
 
@@ -176,6 +244,25 @@ mod tests {
         assert_eq!(names, ["1-one.md", "2-two.md", "10-end.md"]); // no hidden, no subfolder
         assert_eq!(p.skipped, [dir.join("logo.png")]);
         assert_eq!(summary(&p).unwrap(), "Opened 3 files. Skipped 1 that isn't text: logo.png");
+        let slash = PathBuf::from(format!("{}/", dir.display()));
+        assert_eq!(plan(&[slash]).folder, Some(dir.clone()));
+    }
+
+    #[test]
+    fn list_titles_and_identity() {
+        let files = |v: &[&str]| v.iter().map(PathBuf::from).collect::<Vec<_>>();
+        let folder = FileList { folder: Some("/x/docs".into()), files: files(&["/x/docs/a.md"]) };
+        assert_eq!(folder.title(), "docs");
+        let together = FileList { folder: None, files: files(&["/x/notes/a.md", "/x/notes/b.md"]) };
+        assert_eq!(together.title(), "notes");
+        let mixed = FileList { folder: None, files: files(&["/x/a.md", "/y/b.md"]) };
+        assert_eq!(mixed.title(), "Files");
+        // Opening the same folder again finds the window that has it, even if its files changed.
+        assert!(folder.same_as(&FileList { folder: Some("/x/docs".into()), files: vec![] }));
+        assert!(!folder.same_as(&together));
+        assert!(together.same_as(&together.clone()));
+        let p = together.payload();
+        assert_eq!((p.title.as_str(), p.items.len(), p.items[1].name.as_str()), ("notes", 2, "b.md"));
     }
 
     #[test]

@@ -49,25 +49,27 @@ open_file "$FIX/data.csv";               expect "second file while running: new 
 open_file "$FIX/sample.md";              expect "reopening a file: no duplicate" "data.csv sample.md" "$(windows)"
 launch; sleep 1.5;                       expect "Dock click with windows open: no new window" "data.csv sample.md" "$(windows)"
 quit
-open_file "$FIX/sample.md" "$FIX/app.log"; expect "cold start with two files" "app.log sample.md" "$(windows)"
+open_file "$FIX/sample.md" "$FIX/app.log"; expect "cold start with two files: one window" "app.log" "$(windows)"
 quit
 launch; sleep 2.5;                       expect "plain launch: one empty window" "Plica" "$(windows)"
 open_file "$FIX/app.log";                expect "file goes into the empty window" "app.log" "$(windows)"
 quit
 
-# Batches (Window → Open Multiple Files as Tabs, on by default): several files at once, or a folder,
-# become one window with a tab per file, in name order, binaries skipped.
-count() { wc -w <<<"$1" | tr -d ' '; }
+# Batches: several files at once, or a folder, become one window with the files listed in a sidebar
+# (name order, binaries skipped), showing the first one. The window title is the file shown.
+recent_first() { python3 -c 'import json,sys,os; r=json.load(open(sys.argv[1])).get("recent",[]); print(os.path.basename(r[0]) if r else "")' "$SETTINGS"; }
 open_file "$FIX/sample.md" "$FIX/app.log" "$FIX/data.csv"
-expect "three files at once: all open" "app.log data.csv sample.md" "$(windows)"
-expect "three files at once: as tabs in one window" "1" "$(count "$(windows on)")"
+expect "three files at once: one window, first by name" "app.log" "$(windows)"
+open_file "$FIX/data.csv";               expect "a listed file opens in that window" "data.csv" "$(windows)"
 quit
 BATCH="$(mktemp -d)"; mkdir "$BATCH/sub"
 for n in a1 a2 a10; do printf '# %s\n' "$n" > "$BATCH/$n.md"; done
 printf '\x89PNG\x00\x00\x01' > "$BATCH/logo.png"; printf 'x' > "$BATCH/.hidden.md"; printf 'x' > "$BATCH/sub/inner.md"
-open_file "$BATCH"
-expect "folder: its text files, no hidden/binary/subfolder" "a1.md a10.md a2.md" "$(windows)"
-expect "folder: first by name in front" "a1.md" "$(windows on)"
+open_file "$BATCH";                      expect "folder: one window, first by name" "a1.md" "$(windows)"
+expect "folder: in Open Recent as the folder" "$(basename "$BATCH")" "$(recent_first)"
+open_file "$BATCH/a10.md";               expect "a file of that folder opens in its window" "a10.md" "$(windows)"
+open_file "$BATCH";                      expect "the same folder again: no second window" "a1.md" "$(windows)"
+open_file "$FIX/other.md";               expect "a file outside the folder: its own window" "a1.md other.md" "$(windows)"
 rm -rf "$BATCH"
 quit
 

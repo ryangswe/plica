@@ -49,6 +49,7 @@ Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, insta
 | <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Reload |
 | <kbd>Cmd/Ctrl</kbd> <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | Zoom |
 | <kbd>Alt</kbd> <kbd>←</kbd> or <kbd>Cmd/Ctrl</kbd> <kbd>[</kbd> | Back (after following a link to another file) |
+| <kbd>Ctrl</kbd> <kbd>Cmd</kbd> <kbd>S</kbd> (macOS), <kbd>Ctrl</kbd> <kbd>B</kbd> | Show or hide the file list |
 
 On macOS everything is also in the menu bar, plus:
 
@@ -59,9 +60,10 @@ On macOS everything is also in the menu bar, plus:
 | <kbd>Cmd</kbd> <kbd>1</kbd>…<kbd>9</kbd>, <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Switch tabs (Window → Merge All Windows to put windows in tabs) |
 | <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>M</kbd> | Merge All Windows |
 
-**Several files at once:** select them in Finder and open them (or drop them on Plica) to get one window with a
-tab per file. **File → Open Folder as Tabs…** (Shift+Cmd+O, or drop a folder) opens every text file in a folder,
-in Finder's name order. Turn this off in Window → Open Multiple Files as Tabs.
+**Several files or a folder:** select files in Finder and open them, drop them on Plica, or use **File → Open
+Folder…** (Shift+Cmd+O, or drop a folder). You get one window with the files listed on the left in Finder's name
+order; click one (or use the arrow keys) to show it. Only the folder's own text files are listed: subfolders,
+hidden files and files that aren't text are left out.
 
 If a file's characters look wrong, click its encoding in the top bar (or File → Reopen with Encoding) to pick another.
 

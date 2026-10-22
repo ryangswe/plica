@@ -201,6 +201,45 @@ kbd {
 mark.find-hit { background: var(--mark); color: inherit; border-radius: 2px; }
 mark.find-hit.current { background: var(--mark-current); color: #000; }
 
+/* ---------- Sidebar (file list) ---------- */
+.body { flex: 1; display: flex; min-height: 0; position: relative; }
+.main-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.sidebar {
+  flex: none;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg-soft);
+  font-size: 13px;
+}
+.sidebar-head { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px 6px; }
+.sidebar-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-count { color: var(--fg-muted); font-size: 12px; }
+.sidebar-list { list-style: none; margin: 0; padding: 0 6px 10px; overflow: auto; flex: 1; }
+.sidebar-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-item:hover { background: var(--bg-sunk); }
+.sidebar-item[aria-current="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sidebar-item:focus-visible { outline-offset: -2px; }
+.sidebar-btn { display: inline-flex; align-items: center; padding: 3px 6px; background: transparent; border-color: transparent; opacity: 0.8; }
+.sidebar-btn:hover { opacity: 1; }
+.sidebar-btn[aria-pressed="true"] { opacity: 1; color: var(--accent); }
+/* Narrow window: the list floats over the file instead of squeezing it. */
+@media (max-width: 640px) {
+  .sidebar { position: absolute; top: 0; bottom: 0; left: 0; z-index: 20; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18); }
+}
+
 /* ---------- View ---------- */
 .view-scroll { flex: 1; overflow: auto; position: relative; outline: none; }
 .view-content { min-height: 100%; }
