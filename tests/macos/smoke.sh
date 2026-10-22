@@ -70,6 +70,19 @@ expect "folder: in Open Recent as the folder" "$(basename "$BATCH")" "$(recent_f
 open_file "$BATCH/a10.md";               expect "a file of that folder opens in its window" "a10.md" "$(windows)"
 open_file "$BATCH";                      expect "the same folder again: no second window" "a1.md" "$(windows)"
 open_file "$FIX/other.md";               expect "a file outside the folder: its own window" "a1.md other.md" "$(windows)"
+quit
+
+# Window → Open Groups of Files as Tabs: one native tab per file instead of a list. The windows are made
+# hidden and shown once they're tabs, so none flash by.
+set_setting() { python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d[sys.argv[2]]=json.loads(sys.argv[3]); json.dump(d,open(p,"w"))' "$SETTINGS" "$1" "$2"; }
+set_setting groupsAsTabs true
+launch; sleep 2.5
+FLASH="$(mktemp)"; osascript -l JavaScript "$HERE/max-onscreen.js" 4000 >"$FLASH" & sleep 0.2
+open_file "$BATCH"
+expect "tabs setting: the folder's files as tabs" "a1.md a10.md a2.md" "$(windows)"
+expect "tabs setting: first by name in front, in the empty window" "a1.md" "$(windows on)"
+wait; expect "tabs setting: no windows flash by" "1" "$(cat "$FLASH")"; rm -f "$FLASH"
+set_setting groupsAsTabs false
 rm -rf "$BATCH"
 quit
 

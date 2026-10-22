@@ -62,8 +62,10 @@ On macOS everything is also in the menu bar, plus:
 
 **Several files or a folder:** select files in Finder and open them, drop them on Plica, or use **File → Open
 Folder…** (Shift+Cmd+O, or drop a folder). You get one window with the files listed on the left in Finder's name
-order; click one (or use the arrow keys) to show it. Only the folder's own text files are listed: subfolders,
-hidden files and files that aren't text are left out.
+order; click one (or use the arrow keys) to show it. To give a file a window of its own, Cmd-click it, drag it
+out of the window, or right-click it → Open in New Window. Only the folder's own text files are listed:
+subfolders, hidden files and files that aren't text are left out. Prefer tabs? On macOS, Window → **Open Groups
+of Files as Tabs** opens one tab per file instead.
 
 If a file's characters look wrong, click its encoding in the top bar (or File → Reopen with Encoding) to pick another.
 

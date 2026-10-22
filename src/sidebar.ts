@@ -37,7 +37,24 @@ export interface Sidebar {
  * The file list on the left. Clicking a file (or moving with the arrow keys) shows it in this window.
  * Only one item is in the Tab order (the current one), so Tab doesn't walk through every file.
  */
-export function createSidebar(onPick: (item: ListItem) => void, onOpenChange: (open: boolean) => void): Sidebar {
+export interface SidebarActions {
+  /** Show the item in this window. */
+  pick(item: ListItem): void;
+  /** Open the item in a window of its own (Cmd/Ctrl-click, or dragged out of the window to `at`). */
+  openNew(item: ListItem, at?: { x: number; y: number }): void;
+  /** Right-click; return true if a menu was shown (else the default one appears). */
+  menu(item: ListItem, x: number, y: number): boolean;
+  openChange(open: boolean): void;
+}
+
+/** True when a drag ended outside this window (screen coordinates). */
+export function droppedOutside(e: { screenX: number; screenY: number }, win: { screenX: number; screenY: number; outerWidth: number; outerHeight: number }): boolean {
+  return e.screenX < win.screenX || e.screenY < win.screenY || e.screenX > win.screenX + win.outerWidth || e.screenY > win.screenY + win.outerHeight;
+}
+
+export function createSidebar(actions: SidebarActions): Sidebar {
+  const onPick = actions.pick;
+  const onOpenChange = actions.openChange;
   const title = el("div", { class: "sidebar-title" });
   const count = el("span", { class: "sidebar-count" });
   const listEl = el("ul", { class: "sidebar-list" });
@@ -71,10 +88,26 @@ export function createSidebar(onPick: (item: ListItem) => void, onOpenChange: (o
       count.textContent = String(items.length);
       buttons = items.map((item) => {
         const b = el("button", { class: "sidebar-item", title: item.path ?? item.name, "data-key": item.key }, item.name);
-        b.addEventListener("click", () => {
+        b.addEventListener("click", (e) => {
+          if ((e.metaKey || e.ctrlKey) && item.path) return actions.openNew(item);
           b.focus(); // WebKit doesn't focus buttons on click; keep the arrow keys in the list
           onPick(item);
         });
+        b.addEventListener("contextmenu", (e) => {
+          if (actions.menu(item, e.clientX, e.clientY)) e.preventDefault();
+        });
+        if (item.path) {
+          // Drag a file out of the window to open it in a window of its own.
+          const path = item.path;
+          b.draggable = true;
+          b.addEventListener("dragstart", (e) => {
+            e.dataTransfer?.setData("text/plain", path);
+            if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+          });
+          b.addEventListener("dragend", (e) => {
+            if (droppedOutside(e, window)) actions.openNew(item, { x: e.screenX, y: e.screenY });
+          });
+        }
         return b;
       });
       listEl.replaceChildren(...buttons.map((b) => el("li", {}, b)));

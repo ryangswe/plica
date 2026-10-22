@@ -75,6 +75,32 @@ fn check(app: &AppHandle) {
     }
 }
 
+/// Put these windows into one native tab group, in this order, after `anchor` (a window whose tab group
+/// they join), and bring the first of them forward. Windows created hidden appear as tabs.
+pub fn group_as_tabs(app: &AppHandle, anchor: Option<&str>, labels: &[String]) {
+    let windows: Vec<&NSWindow> = anchor
+        .into_iter()
+        .chain(labels.iter().map(String::as_str))
+        .filter_map(|l| app.get_webview_window(l)?.ns_window().ok())
+        // SAFETY: live NSWindows from Tauri; this runs on the main thread.
+        .map(|ptr| unsafe { &*(ptr as *const NSWindow) })
+        .collect();
+    for pair in windows.windows(2) {
+        // Each one right after the previous, so the tabs keep the batch order.
+        pair[0].addTabbedWindow_ordered(pair[1], objc2_app_kit::NSWindowOrderingMode::Above);
+    }
+    let Some(first) = labels.first().and_then(|l| app.get_webview_window(l)) else { return };
+    let _ = first.show();
+    if let Ok(ptr) = first.ns_window() {
+        // SAFETY: as above.
+        let first = unsafe { &*(ptr as *const NSWindow) };
+        if let Some(group) = first.tabGroup() {
+            group.setSelectedWindow(Some(first));
+        }
+        first.makeKeyAndOrderFront(None);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -175,10 +175,12 @@ fn select_tab(window: WebviewWindow, n: usize) {
     let _ = (window, n);
 }
 
-/// Cmd/Ctrl-click on a link: open the file in its own window (or focus the one already showing it).
+/// Cmd/Ctrl-click on a link or a listed file, or a file dragged out of the list: open it in a window of
+/// its own (or focus another window already showing it). `x`/`y`: where it was dropped, in screen points.
 #[tauri::command]
-fn open_window(app: AppHandle, path: String) {
-    open_paths(&app, vec![PathBuf::from(path)]);
+fn open_window(window: WebviewWindow, path: String, x: Option<f64>, y: Option<f64>) {
+    let at = x.zip(y);
+    open::open_elsewhere(window.app_handle(), window.label(), PathBuf::from(path), at);
 }
 
 /// The file a window currently shows.
@@ -189,10 +191,19 @@ fn current_file(app: &AppHandle, label: &str) -> Option<PathBuf> {
 
 /// Create a window (showing `path`, or empty) and return its label.
 fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String> {
-    create_window_with(app, path, None)
+    create_window_with(app, path, None, WindowOpts::default())
 }
 
-fn create_window_with(app: &AppHandle, path: Option<PathBuf>, list: Option<batch::FileList>) -> tauri::Result<String> {
+/// How to create a window, beyond what it shows.
+#[derive(Default, Clone, Copy)]
+struct WindowOpts {
+    /// Top-left corner of the title bar near this screen point (a file dragged out of a list).
+    at: Option<(f64, f64)>,
+    /// Create it hidden, to show it once it's in place (a batch opened as tabs).
+    hidden: bool,
+}
+
+fn create_window_with(app: &AppHandle, path: Option<PathBuf>, list: Option<batch::FileList>, opts: WindowOpts) -> tauri::Result<String> {
     let state = app.state::<AppState>();
     let n = state.counter.fetch_add(1, Ordering::SeqCst);
     let label = format!("w{n}");
@@ -209,6 +220,7 @@ fn create_window_with(app: &AppHandle, path: Option<PathBuf>, list: Option<batch
         .title("Plica")
         .inner_size(1000.0, 780.0)
         .min_inner_size(420.0, 320.0)
+        .visible(!opts.hidden)
         .zoom_hotkeys_enabled(true); // Ctrl/Cmd + / - / 0 to zoom
     // Native macOS tabs: Window → Merge All Windows, and the "Prefer tabs" system setting.
     #[cfg(target_os = "macos")]
@@ -220,7 +232,10 @@ fn create_window_with(app: &AppHandle, path: Option<PathBuf>, list: Option<batch
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true);
     // Cascade new windows a little so they don't stack exactly on top of each other.
-    let builder = if n > 0 {
+    let builder = if let Some((x, y)) = opts.at {
+        // The pointer lands on the title bar, a little in from the left (past the traffic lights).
+        builder.position((x - 120.0).max(0.0), (y - 12.0).max(0.0))
+    } else if n > 0 {
         let offset = 40.0 + (n % 8) as f64 * 28.0;
         builder.position(offset + 60.0, offset)
     } else {

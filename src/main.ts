@@ -67,10 +67,22 @@ const find = createFindBar(
 // Shown only while the macOS tab bar is visible (see .titlebar-drag).
 const titlebarDrag = el("div", { class: "titlebar-drag", "data-tauri-drag-region": "", hidden: "" });
 // A folder or several files opened together: their list, on the left of the file.
-const sidebar = createSidebar(
-  (item) => void showItem(item),
-  (open) => sidebarBtn.setAttribute("aria-pressed", String(open)),
-);
+const sidebar = createSidebar({
+  pick: (item) => void showItem(item),
+  openNew: (item, at) => item.path && host.openInNewWindow(item.path, at),
+  menu: (item, x, y) =>
+    !!item.path &&
+    host.contextMenu(
+      [
+        { text: "Open in New Window", action: () => host.openInNewWindow(item.path!) },
+        { text: isMac ? "Reveal in Finder" : "Show in Folder", action: () => host.reveal(item.path!) },
+        { text: "Copy Path", action: () => void copyText(item.path!, "Copied path") },
+      ],
+      x,
+      y,
+    ),
+  openChange: (open) => sidebarBtn.setAttribute("aria-pressed", String(open)),
+});
 const body = el("div", { class: "body" }, sidebar.el, el("div", { class: "main-col" }, staleBar, defaultsBar, remoteBar, view));
 app.append(titlebarDrag, bar, body, find.bar, toast, dropOverlay);
 

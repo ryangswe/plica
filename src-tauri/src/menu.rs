@@ -110,6 +110,9 @@ pub fn recent_labels(list: &[PathBuf]) -> Vec<String> {
         .collect()
 }
 
+/// Window → Open Groups of Files as Tabs.
+struct GroupsAsTabsToggle(CheckMenuItem<Wry>);
+
 /// View → Load Remote Images.
 struct RemoteToggle(CheckMenuItem<Wry>);
 
@@ -244,9 +247,16 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     // The Window menu id makes Tauri register it with AppKit, which adds the window list and the tab
     // commands (Show Previous/Next Tab, Move Tab to New Window, Merge All Windows).
+    // Like Preview's "Open groups of files in the same window" setting: off = one window with a file list.
+    let groups_as_tabs = CheckMenuItemBuilder::with_id("toggle-groups-as-tabs", "Open Groups of Files as Tabs")
+        .checked(crate::settings::groups_as_tabs(app))
+        .build(app)?;
+    app.manage(GroupsAsTabsToggle(groups_as_tabs.clone()));
     let window = SubmenuBuilder::with_id(app, WINDOW_SUBMENU_ID, "Window")
         .minimize()
         .maximize()
+        .separator()
+        .item(&groups_as_tabs)
         .separator()
         .bring_all_to_front()
         .build()?;
@@ -309,6 +319,10 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
                     crate::batch::open(&handle, vec![dir], None);
                 }
             });
+        }
+        "toggle-groups-as-tabs" => {
+            let on = app.state::<GroupsAsTabsToggle>().0.is_checked().unwrap_or(false);
+            crate::settings::write(app, "groupsAsTabs", serde_json::Value::Bool(on));
         }
         "reveal" => {
             if let Some((_, path)) = focused_file(app) {

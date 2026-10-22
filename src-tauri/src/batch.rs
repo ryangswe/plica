@@ -190,6 +190,22 @@ pub fn open(app: &AppHandle, paths: Vec<PathBuf>, target: Option<String>) {
 
 fn open_plan(app: &AppHandle, plan: Plan, target: Option<String>) {
     let message = summary(&plan);
+    #[cfg(target_os = "macos")]
+    if let Some(folder) = plan.folder.clone().filter(|_| !plan.files.is_empty()) {
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || crate::menu::note_recent(&handle, &folder));
+    }
+    // Window → Open Groups of Files as Tabs: one native tab per file instead of a file list.
+    #[cfg(target_os = "macos")]
+    if crate::settings::groups_as_tabs(app) && plan.files.len() > 1 {
+        let labels = crate::open::open_for_tabs(app, plan.files, target.is_some());
+        let (handle, tabs, anchor) = (app.clone(), labels.clone(), target.clone());
+        let _ = app.run_on_main_thread(move || crate::chrome::group_as_tabs(&handle, anchor.as_deref(), &tabs));
+        if let Some(msg) = message {
+            crate::notify(app, labels.first().or(target.as_ref()).map(String::as_str), &msg);
+        }
+        return;
+    }
     let label = match (&plan.folder, plan.files.as_slice()) {
         (_, []) => target,
         // One file chosen (plus some that aren't text): no list needed.
@@ -203,14 +219,7 @@ fn open_plan(app: &AppHandle, plan: Plan, target: Option<String>) {
                 None
             }
         },
-        _ => {
-            #[cfg(target_os = "macos")]
-            if let Some(folder) = plan.folder.clone() {
-                let handle = app.clone();
-                let _ = app.run_on_main_thread(move || crate::menu::note_recent(&handle, &folder));
-            }
-            crate::open_list(app, FileList { folder: plan.folder, files: plan.files }, target)
-        }
+        _ => crate::open_list(app, FileList { folder: plan.folder, files: plan.files }, target),
     };
     if let Some(msg) = message {
         crate::notify(app, label.as_deref(), &msg);

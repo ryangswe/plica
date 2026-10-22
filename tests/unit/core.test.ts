@@ -16,7 +16,7 @@ import { countRemoteRefs } from "../../src/renderers/simple";
 import { pickRenderer } from "../../src/renderers";
 import { renderRaw } from "../../src/renderers/raw";
 import type { FileDoc, RenderContext } from "../../src/types";
-import { createSidebar, sortByName, type ListItem } from "../../src/sidebar";
+import { createSidebar, droppedOutside, sortByName, type ListItem } from "../../src/sidebar";
 
 const fixture = (name: string) => readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8");
 const doc = (name: string, text = fixture(name)): FileDoc => ({ path: `/tmp/fx/${name}`, name, text, size: text.length, binary: false, truncated: false, encoding: "UTF-8" });
@@ -425,6 +425,14 @@ describe("polish", () => {
 });
 
 describe("sidebar", () => {
+  it("knows when a file was dragged out of the window", () => {
+    const win = { screenX: 100, screenY: 50, outerWidth: 800, outerHeight: 600 };
+    expect(droppedOutside({ screenX: 500, screenY: 300 }, win)).toBe(false);
+    expect(droppedOutside({ screenX: 950, screenY: 300 }, win)).toBe(true);
+    expect(droppedOutside({ screenX: 500, screenY: 20 }, win)).toBe(true);
+    expect(droppedOutside({ screenX: 99, screenY: 300 }, win)).toBe(true);
+  });
+
   it("sorts names like Finder: case-insensitive, numbers by value", () => {
     const names = sortByName(["b.md", "10 faq.md", "README", "2 setup.md", "a.md", "1 intro.md"].map((name) => ({ name }))).map((x) => x.name);
     expect(names).toEqual(["1 intro.md", "2 setup.md", "10 faq.md", "a.md", "b.md", "README"]);
@@ -433,7 +441,14 @@ describe("sidebar", () => {
   it("lists files, marks the shown one, and moves with the arrow keys", () => {
     const picked: string[] = [];
     const opened: boolean[] = [];
-    const sb = createSidebar((item) => picked.push(item.key), (open) => opened.push(open));
+    const newWindow: string[] = [];
+    const menus: string[] = [];
+    const sb = createSidebar({
+      pick: (item) => picked.push(item.key),
+      openNew: (item) => newWindow.push(item.key),
+      menu: (item) => (menus.push(item.key), true),
+      openChange: (open) => opened.push(open),
+    });
     document.body.append(sb.el);
     const items: ListItem[] = ["/d/a.md", "/d/b.md", "/d/c.md"].map((p) => ({ key: p, name: p.slice(3), path: p }));
     sb.setList({ title: "d", items });
@@ -453,6 +468,14 @@ describe("sidebar", () => {
     buttons[1].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     buttons[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); // last: stays
     expect(picked).toEqual(["/d/a.md", "/d/c.md"]);
+
+    // Cmd/Ctrl-click opens a window of its own; right-click asks for a menu (and blocks the default one).
+    buttons[0].dispatchEvent(new MouseEvent("click", { metaKey: true, bubbles: true }));
+    const ctx = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    buttons[1].dispatchEvent(ctx);
+    expect([newWindow, menus, ctx.defaultPrevented]).toEqual([["/d/a.md"], ["/d/b.md"], true]);
+    expect(picked).toEqual(["/d/a.md", "/d/c.md"]); // the Cmd-click didn't also show it here
+    expect(buttons.every((b) => b.draggable)).toBe(true);
 
     sb.markCurrent("/elsewhere.md"); // a linked file outside the list
     expect(sb.el.querySelectorAll("[aria-current]").length).toBe(0);

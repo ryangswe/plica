@@ -41,6 +41,12 @@ pub fn set_remote_content(app: &AppHandle, allowed: bool) {
     let _ = app.emit("remote-content", allowed);
 }
 
+/// Open groups of files as native tabs instead of one window with a file list (macOS; off by default).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub fn groups_as_tabs(app: &AppHandle) -> bool {
+    read(app).get("groupsAsTabs").and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
 #[tauri::command]
 pub fn get_remote_content(app: AppHandle) -> bool {
     remote_content(&app)

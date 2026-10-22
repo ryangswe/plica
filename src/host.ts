@@ -49,7 +49,12 @@ export interface Host {
   assetUrl(path: string): string | null;
   openExternal(url: string): void;
   setTitle(title: string): void;
-  openInNewWindow(path: string): void;
+  /** Open a file in a window of its own; `at` is a screen point to put it at (dragged out of the list). */
+  openInNewWindow(path: string, at?: { x: number; y: number }): void;
+  /** Show the file in Finder / Explorer / the file manager. */
+  reveal(path: string): void;
+  /** Show a native context menu at this point in the page; false if the host has none (browser). */
+  contextMenu(items: { text: string; action: () => void }[], x: number, y: number): boolean;
   /** Bring the n-th native tab (1–9, 9 = last) of this window forward. macOS desktop only. */
   selectTab(n: number): void;
 }
@@ -184,6 +189,10 @@ export function createBrowserHost(): Host {
       document.title = title;
     },
     openInNewWindow() {},
+    reveal() {},
+    contextMenu() {
+      return false;
+    },
     selectTab() {},
   };
 }
@@ -193,7 +202,9 @@ export async function createTauriHost(): Promise<Host> {
   const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
   const { listen } = await import("@tauri-apps/api/event");
   const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
-  const { openUrl } = await import("@tauri-apps/plugin-opener");
+  const { openUrl, revealItemInDir } = await import("@tauri-apps/plugin-opener");
+  const { Menu } = await import("@tauri-apps/api/menu");
+  const { LogicalPosition } = await import("@tauri-apps/api/dpi");
   const win = getCurrentWebviewWindow();
   let changeHandler: (() => void) | null = null;
 
@@ -219,10 +230,12 @@ export async function createTauriHost(): Promise<Host> {
       await win.listen<string>("file-changed", () => changeHandler?.());
       await win.onDragDropEvent((e) => {
         const p = e.payload;
-        if (p.type === "enter" || p.type === "over") dragging(true);
+        // Dragging an item of the file list carries no files: not a drop to open.
+        if (p.type === "enter") dragging(p.paths.length > 0);
         else if (p.type === "leave") dragging(false);
         else if (p.type === "drop") {
           dragging(false);
+          if (!p.paths.length) return;
           // One file opens here; several files or a folder become this window's file list.
           invoke<string | null>("open_dropped", { paths: p.paths })
             .then((single) => single && openPath(single))
@@ -257,8 +270,18 @@ export async function createTauriHost(): Promise<Host> {
     setTitle(title) {
       win.setTitle(title).catch(() => {});
     },
-    openInNewWindow(path) {
-      invoke("open_window", { path }).catch(() => {});
+    openInNewWindow(path, at) {
+      invoke("open_window", { path, x: at?.x ?? null, y: at?.y ?? null }).catch(() => {});
+    },
+    reveal(path) {
+      revealItemInDir(path).catch(() => {});
+    },
+    contextMenu(items, x, y) {
+      void (async () => {
+        const menu = await Menu.new({ items: items.map((i) => ({ text: i.text, action: i.action })) });
+        await menu.popup(new LogicalPosition(x, y));
+      })().catch(() => {});
+      return true;
     },
     selectTab(n) {
       invoke("select_tab", { n }).catch(() => {});

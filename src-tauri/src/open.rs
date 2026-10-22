@@ -8,7 +8,7 @@ use std::{
 
 use tauri::{AppHandle, Emitter, EventTarget, Manager, WebviewWindow};
 
-use crate::{batch, create_window, create_window_with, AppState, WindowState};
+use crate::{batch, create_window, create_window_with, AppState, WindowOpts, WindowState};
 
 pub fn canon(p: &Path) -> PathBuf {
     std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
@@ -16,9 +16,14 @@ pub fn canon(p: &Path) -> PathBuf {
 
 /// The window already showing `path`, if any (compared after resolving symlinks and `..`).
 pub fn window_showing(windows: &HashMap<String, WindowState>, path: &Path) -> Option<String> {
+    window_showing_except(windows, path, None)
+}
+
+fn window_showing_except(windows: &HashMap<String, WindowState>, path: &Path, except: Option<&str>) -> Option<String> {
     let target = canon(path);
     windows
         .iter()
+        .filter(|(label, _)| Some(label.as_str()) != except)
         .filter(|(_, w)| w.current.as_deref().is_some_and(|c| canon(c) == target))
         .map(|(label, _)| label.clone())
         .min()
@@ -61,6 +66,41 @@ pub fn open_one(app: &AppHandle, path: PathBuf) -> Option<String> {
         }
         Some((label, false)) => Some(label), // the frontend picks it up via take_initial_file
         None => create_window(app, Some(path)).map_err(|e| eprintln!("failed to open window: {e}")).ok(),
+    }
+}
+
+/// A batch as native tabs (macOS setting): the first file opens like any other (reusing an empty window),
+/// the rest in hidden windows that `chrome::group_as_tabs` shows once they're tabs, so no windows flash
+/// by. Files already open are left where they are. Returns the new windows in order.
+#[cfg(target_os = "macos")]
+pub fn open_for_tabs(app: &AppHandle, files: Vec<PathBuf>, into_existing: bool) -> Vec<String> {
+    let mut labels = Vec::new();
+    for (i, path) in files.into_iter().enumerate() {
+        if window_showing(&app.state::<AppState>().windows.lock().unwrap(), &path).is_some() {
+            continue;
+        }
+        let label = if i == 0 && !into_existing {
+            open_one(app, path)
+        } else {
+            create_window_with(app, Some(path), None, WindowOpts { hidden: true, ..Default::default() })
+                .map_err(|e| eprintln!("failed to open window: {e}"))
+                .ok()
+        };
+        labels.extend(label);
+    }
+    labels
+}
+
+/// Open `path` in a window other than `from`: another one already showing it, else a new one (at `at`).
+pub fn open_elsewhere(app: &AppHandle, from: &str, path: PathBuf, at: Option<(f64, f64)>) {
+    let other = window_showing_except(&app.state::<AppState>().windows.lock().unwrap(), &path, Some(from));
+    if let Some(w) = other.and_then(|label| app.get_webview_window(&label)) {
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return;
+    }
+    if let Err(e) = create_window_with(app, Some(path), None, WindowOpts { at, ..Default::default() }) {
+        eprintln!("failed to open window: {e}");
     }
 }
 
@@ -117,7 +157,7 @@ pub fn open_list(app: &AppHandle, list: batch::FileList, target: Option<String>)
         })
     });
     let Some(label) = existing else {
-        return create_window_with(app, Some(first), Some(list)).map_err(|e| eprintln!("failed to open window: {e}")).ok();
+        return create_window_with(app, Some(first), Some(list), WindowOpts::default()).map_err(|e| eprintln!("failed to open window: {e}")).ok();
     };
     let payload = list.payload();
     let ready = {
@@ -188,5 +228,7 @@ mod tests {
         // Same file through a different spelling of the path.
         assert_eq!(window_showing(&windows, &dir.join("sub/../a.md")), Some("w1".into()));
         assert_eq!(window_showing(&windows, &dir.join("b.md")), None);
+        // Pulling a file out of the window showing it: that window doesn't count.
+        assert_eq!(window_showing_except(&windows, &dir.join("a.md"), Some("w1")), None);
     }
 }

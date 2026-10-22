@@ -36,7 +36,8 @@ tests/
   fixtures/              sample files for every type (also nice for manual testing)
   unit/                  vitest
   e2e/                   playwright (Chromium + WebKit); screenshots in test-results/screens/<browser>/
-  macos/smoke.sh         opens files in the installed .app via `open -a` and checks the windows/tabs (local only)
+  macos/smoke.sh         opens files in the installed .app via `open -a` and checks the windows/tabs (local only;
+                         windows.js lists them, max-onscreen.js catches windows flashing by)
 ```
 
 Flow: Rust creates a window per file and stores the path as "pending". The frontend registers listeners,
