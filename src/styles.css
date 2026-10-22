@@ -116,7 +116,7 @@ kbd {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  height: 44px;
+  height: var(--toolbar-h);
   padding: 0 10px 0 12px;
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
@@ -133,7 +133,16 @@ kbd {
 }
 /* macOS: the bar is the title bar; leave room for the traffic lights, except in full screen (none) or
    when the tab bar shows (the toolbar then sits below it, like Safari). */
-:root[data-platform="mac"][data-host="tauri"] .topbar { padding-left: 84px; }
+:root { --toolbar-h: 44px; }
+/* macOS: a compact 32px bar, so its controls line up with the traffic lights where macOS puts them
+   (centered 16pt from the top). We don't move the buttons: that breaks the native tab bar. */
+:root[data-platform="mac"][data-host="tauri"] { --toolbar-h: 32px; }
+:root[data-platform="mac"][data-host="tauri"] .topbar { padding-left: 78px; }
+:root[data-platform="mac"][data-host="tauri"] .mode-switch { padding: 1px; }
+:root[data-platform="mac"][data-host="tauri"] .mode-switch button { padding: 0 11px; line-height: 20px; }
+:root[data-platform="mac"][data-host="tauri"] .topbar .ghost { padding: 1px 8px; line-height: 20px; }
+/* With the tab bar showing, the title row above it is page under a transparent title bar: make it drag. */
+.titlebar-drag { position: fixed; top: 0; left: 0; right: 0; height: var(--tabbar-inset, 0px); z-index: 30; }
 :root[data-platform="mac"][data-fullscreen="1"] .topbar,
 :root[data-platform="mac"][data-tabbar="1"] .topbar { padding-left: 12px; }
 :root[data-tabbar="1"] #app { padding-top: var(--tabbar-inset); }
@@ -174,7 +183,7 @@ kbd {
 /* ---------- Find bar ---------- */
 .find-bar {
   position: absolute;
-  top: calc(52px + var(--tabbar-inset, 0px));
+  top: calc(var(--toolbar-h) + 8px + var(--tabbar-inset, 0px));
   right: 16px;
   z-index: 20;
   display: flex;
@@ -460,7 +469,7 @@ button.primary:hover { filter: brightness(1.08); background: var(--accent); }
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
 }
 .svg-preview { max-width: 100%; max-height: calc(100vh - 140px); }
-.html-stage { height: calc(100vh - 44px); }
+.html-stage { height: calc(100vh - var(--toolbar-h) - var(--tabbar-inset, 0px)); }
 .html-preview { display: block; width: 100%; height: 100%; border: 0; background: #fff; } /* block: no inline gap below */
 
 /* ---------- JSON ---------- */
@@ -529,7 +538,7 @@ button.primary:hover { filter: brightness(1.08); background: var(--accent); }
 .data-table th.rownum { z-index: 2; }
 .data-table tbody tr:hover td { background: var(--accent-soft); }
 .type-csv .toolbar, .type-tsv .toolbar { position: static; }
-.table-view { display: flex; flex-direction: column; height: calc(100vh - 44px); }
+.table-view { display: flex; flex-direction: column; height: calc(100vh - var(--toolbar-h) - var(--tabbar-inset, 0px)); }
 .table-view .table-scroll { flex: 1; }
 button.more { margin: 12px auto; display: block; }
 

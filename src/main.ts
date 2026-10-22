@@ -55,7 +55,9 @@ const find = createFindBar(
       ? { text: doc.text, isRaw: !!renderer.rawOnly || !renderer.render || mode === "raw", showRaw: () => setMode("raw") }
       : null,
 );
-app.append(bar, staleBar, defaultsBar, remoteBar, find.bar, view, toast, dropOverlay);
+// Shown only while the macOS tab bar is visible (see .titlebar-drag).
+const titlebarDrag = el("div", { class: "titlebar-drag", "data-tauri-drag-region": "", hidden: "" });
+app.append(titlebarDrag, bar, staleBar, defaultsBar, remoteBar, find.bar, view, toast, dropOverlay);
 
 // ---- State ----------------------------------------------------------------
 
@@ -469,6 +471,7 @@ async function boot() {
       const root = document.documentElement;
       root.style.setProperty("--tabbar-inset", `${tabBarInset}px`);
       root.dataset.tabbar = tabBarInset > 0 ? "1" : "";
+      titlebarDrag.hidden = tabBarInset === 0;
       root.dataset.fullscreen = fullscreen ? "1" : "";
     },
     remoteContent: (allowed) => {

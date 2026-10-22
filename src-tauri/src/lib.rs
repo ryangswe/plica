@@ -192,10 +192,10 @@ fn create_window(app: &AppHandle, path: Option<PathBuf>) -> tauri::Result<String
     let builder = builder
         .tabbing_identifier("plica")
         // One toolbar instead of a title bar plus our bar: the page draws under a transparent title
-        // bar, and the traffic lights sit inside our 44px top bar (vertically centered).
+        // bar and its 32px toolbar lines up with the traffic lights. Don't use traffic_light_position:
+        // it resizes the title bar container on every redraw, which squeezes the native tab bar.
         .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true)
-        .traffic_light_position(tauri::LogicalPosition::new(16.0, 22.0));
+        .hidden_title(true);
     // Cascade new windows a little so they don't stack exactly on top of each other.
     let builder = if n > 0 {
         let offset = 40.0 + (n % 8) as f64 * 28.0;
