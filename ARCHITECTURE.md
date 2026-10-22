@@ -19,6 +19,7 @@ src/                     web frontend (TypeScript, no framework, Vite)
   styles.css             all styling; CSS variables for light/dark
 src-tauri/
   src/lib.rs             windows, OS open events, watching, macOS tabs, startup
+  src/open.rs            which window a file or file list goes into (already showing it, listing it, empty, new)
   src/files.rs           reading files for the frontend (size cap, binary, encodings); which watch events matter
   src/batch.rs           several files / a folder at once: name order, skip binaries; one window whose
                          file list the frontend shows in its sidebar (src/sidebar.ts)
