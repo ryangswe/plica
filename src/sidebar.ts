@@ -33,10 +33,6 @@ export interface Sidebar {
   setOpen(open: boolean): void;
 }
 
-/**
- * The file list on the left. Clicking a file (or moving with the arrow keys) shows it in this window.
- * Only one item is in the Tab order (the current one), so Tab doesn't walk through every file.
- */
 export interface SidebarActions {
   /** Show the item in this window. */
   pick(item: ListItem): void;
@@ -52,6 +48,10 @@ export function droppedOutside(e: { screenX: number; screenY: number }, win: { s
   return e.screenX < win.screenX || e.screenY < win.screenY || e.screenX > win.screenX + win.outerWidth || e.screenY > win.screenY + win.outerHeight;
 }
 
+/**
+ * The file list on the left. Clicking a file (or moving with the arrow keys) shows it in this window.
+ * Only one item is in the Tab order (the current one), so Tab doesn't walk through every file.
+ */
 export function createSidebar(actions: SidebarActions): Sidebar {
   const onPick = actions.pick;
   const onOpenChange = actions.openChange;
