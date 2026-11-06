@@ -175,8 +175,7 @@ export function jsonText(value: unknown, top = true): string {
 /** Small "Copy" button for a row (shown on hover/focus), copying that value. */
 function copyButton(value: unknown): HTMLElement {
   const b = el("button", { class: "j-copy", type: "button", title: "Copy this value as JSON" }, "Copy");
-  b.addEventListener("click", async (e) => {
-    e.stopPropagation(); // don't toggle the node
+  const copy = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(jsonText(value));
       b.textContent = "Copied";
@@ -184,6 +183,10 @@ function copyButton(value: unknown): HTMLElement {
       b.textContent = "Couldn't copy";
     }
     window.setTimeout(() => (b.textContent = "Copy"), 1200);
+  };
+  b.addEventListener("click", (e) => {
+    e.stopPropagation(); // don't toggle the node
+    void copy();
   });
   return b;
 }

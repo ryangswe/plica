@@ -63,7 +63,7 @@ never `innerHTML` raw file content; no `eval`; keep `script-src 'self'`; links a
 
 ## Tests
 
-- `npm run typecheck && npm test && npm run test:e2e`, plus `cargo clippy` and `cargo test` (see CLAUDE.md).
+- `npm run typecheck && npm run lint && npm test && npm run test:e2e`, plus `cargo clippy` and `cargo test` (see CLAUDE.md).
 - The e2e tests run against `vite preview`, which sends the same CSP as the app; any CSP violation fails a
   test. Locally, Playwright reuses whatever is already on port 1420, so stop `tauri dev` first.
 - `tests/macos/smoke.sh` (macOS only, needs a real screen): after installing the built app, checks how files

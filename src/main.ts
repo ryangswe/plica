@@ -140,17 +140,18 @@ async function maybeOfferDefault() {
     b.addEventListener("click", onClick);
     return b;
   };
+  const makeMarkdownDefault = async (): Promise<void> => {
+    defaultsBar.hidden = true;
+    try {
+      const [r] = await host.setDefaultApps(["markdown"]);
+      showToast(r?.ok ? "Plica now opens Markdown files." : `Couldn't change it: ${r?.error ?? "unknown error"}`, 3500);
+    } catch (error) {
+      showToast(`Couldn't change it: ${error instanceof Error ? error.message : String(error)}`, 3500);
+    }
+  };
   defaultsBar.replaceChildren(
     el("span", {}, `Markdown files open in ${md.extensions[0]?.app ?? "another app"}. Open them with Plica instead?`),
-    button(
-      "Make default",
-      async () => {
-        defaultsBar.hidden = true;
-        const [r] = await host.setDefaultApps(["markdown"]);
-        showToast(r?.ok ? "Plica now opens Markdown files." : `Couldn't change it: ${r?.error ?? "unknown error"}`, 3500);
-      },
-      true,
-    ),
+    button("Make default", () => void makeMarkdownDefault(), true),
     button("Choose file types…", () => {
       defaultsBar.hidden = true;
       void showDefaultApps();
@@ -335,22 +336,24 @@ function toggleSidebar() {
 let reloadTimer: number | undefined;
 function onFileChanged() {
   clearTimeout(reloadTimer);
-  reloadTimer = window.setTimeout(async () => {
-    if (!doc?.path) return;
-    const path = doc.path;
-    const r = await readWithRetry(() => host.readPath(path, encodingOverride.get(path)));
-    if (doc?.path !== path) return; // switched files meanwhile
-    if (!r.ok) {
-      staleBar.textContent = staleMessage(r.error);
-      staleBar.title = r.error;
-      staleBar.hidden = false;
-      return;
-    }
-    staleBar.hidden = true;
-    if (r.value.text === doc.text) return;
-    setDoc(r.value, { reloaded: true });
-    showToast("Reloaded");
-  }, 150);
+  reloadTimer = window.setTimeout(() => void reloadChanged(), 150);
+}
+
+async function reloadChanged(): Promise<void> {
+  if (!doc?.path) return;
+  const path = doc.path;
+  const r = await readWithRetry(() => host.readPath(path, encodingOverride.get(path)));
+  if (doc?.path !== path) return; // switched files meanwhile
+  if (!r.ok) {
+    staleBar.textContent = staleMessage(r.error);
+    staleBar.title = r.error;
+    staleBar.hidden = false;
+    return;
+  }
+  staleBar.hidden = true;
+  if (r.value.text === doc.text) return;
+  setDoc(r.value, { reloaded: true });
+  showToast("Reloaded");
 }
 
 function setMode(next: Mode) {

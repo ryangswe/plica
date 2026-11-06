@@ -25,8 +25,7 @@ export function addCopyButtons(root: HTMLElement, selector: string): void {
   for (const pre of root.querySelectorAll<HTMLElement>(selector)) {
     const btn = el("button", { type: "button", class: "copy-code", title: "Copy", "aria-label": "Copy code" });
     btn.append(copyIcon());
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
+    const copy = async (): Promise<void> => {
       const text = (pre.textContent ?? "").replace(/\n$/, "");
       try {
         await navigator.clipboard.writeText(text);
@@ -41,6 +40,10 @@ export function addCopyButtons(root: HTMLElement, selector: string): void {
         btn.classList.remove("copied");
         btn.setAttribute("aria-label", "Copy code");
       }, 1500);
+    };
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void copy();
     });
     const wrap = el("div", { class: "code-block" });
     pre.replaceWith(wrap);
