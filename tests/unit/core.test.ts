@@ -379,6 +379,21 @@ describe("default apps", () => {
     sheet.remove();
   });
 
+  it("gives the buttons back and says why when the request itself fails", async () => {
+    const sheet = openDefaultAppsSheet(info(), async () => Promise.reject(new Error("IPC closed")), () => {});
+    const buttons = [...sheet.querySelectorAll("button")];
+    const applyBtn = buttons.find((b) => b.textContent === "Apply")!;
+    applyBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sheet.querySelector(".type-current.failed")?.textContent).toBe("Couldn't change: IPC closed");
+    expect(applyBtn.textContent).toBe("Apply");
+    expect(applyBtn.disabled).toBe(false);
+    const cancel = buttons.find((b) => b.textContent === "Close")!;
+    expect(cancel.disabled).toBe(false);
+    expect(document.querySelector(".sheet-backdrop")).not.toBeNull();
+    sheet.remove();
+  });
+
   it("explains the manual steps where apps can't set defaults (Windows)", () => {
     const sheet = openDefaultAppsSheet({ ...info(), supported: false, platform: "windows" }, async () => [], () => {});
     expect(sheet.textContent).toContain("Settings → Apps → Default apps");

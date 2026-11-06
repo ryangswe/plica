@@ -118,11 +118,19 @@ export function openDefaultAppsSheet(
   });
   for (const b of boxes) b.box.addEventListener("change", sync);
   cancel.addEventListener("click", close);
-  applyBtn.addEventListener("click", async () => {
+  const applyChosen = async (): Promise<void> => {
     const chosen = pending();
     applyBtn.disabled = cancel.disabled = true;
     applyBtn.textContent = "Applying…";
-    const results = await apply(chosen.map((b) => b.type.id));
+    let results: SetResult[];
+    try {
+      results = await apply(chosen.map((b) => b.type.id));
+    } catch (error) {
+      // The request itself failed, so no row can be told apart: each chosen row says why, and the
+      // window stays open with its buttons back, as for a row that failed.
+      const reason = error instanceof Error ? error.message : String(error);
+      results = chosen.map((b) => ({ id: b.type.id, ok: false, error: reason }));
+    }
     const failed = results.filter((r) => !r.ok);
     for (const r of results) {
       const row = boxes.find((b) => b.type.id === r.id);
@@ -142,7 +150,8 @@ export function openDefaultAppsSheet(
       cancel.textContent = "Close";
       sync();
     }
-  });
+  };
+  applyBtn.addEventListener("click", () => void applyChosen());
   sync();
   sheet.append(selectAll, list, el("div", { class: "sheet-actions" }, cancel, applyBtn));
   document.body.append(backdrop);

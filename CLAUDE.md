@@ -10,7 +10,7 @@ PRODUCT.md. Never copy those notes into this repo, which will be public.
 
 - `npm run tauri dev`: run the desktop app
 - `npm run dev`: UI only, in a browser (drag & drop files)
-- `npm run typecheck && npm test && npm run test:e2e`: run all of these before committing
+- `npm run typecheck && npm run lint && npm test && npm run test:e2e`: run all of these before committing (the lint finds unhandled promises and missed switch cases)
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml`
   (also before committing; CI runs both)
 - `npm run tauri build`: installers for the current OS

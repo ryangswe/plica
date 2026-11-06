@@ -151,9 +151,11 @@ export function createBrowserHost(): Host {
           error("Couldn't read that. Folders open in the desktop app."); // a dropped folder isn't readable here
         }
       };
-      input.addEventListener("change", async () => {
-        await openFiles([...(input.files ?? [])]);
-        input.value = "";
+      // openFiles catches everything and reports it through `error`, so it never rejects.
+      input.addEventListener("change", () => {
+        void openFiles([...(input.files ?? [])]).finally(() => {
+          input.value = "";
+        });
       });
       let depth = 0;
       document.addEventListener("dragenter", (e) => {
@@ -164,11 +166,11 @@ export function createBrowserHost(): Host {
         if (--depth === 0) dragging(false);
       });
       document.addEventListener("dragover", (e) => e.preventDefault());
-      document.addEventListener("drop", async (e) => {
+      document.addEventListener("drop", (e) => {
         e.preventDefault();
         depth = 0;
         dragging(false);
-        await openFiles([...(e.dataTransfer?.files ?? [])]);
+        void openFiles([...(e.dataTransfer?.files ?? [])]);
       });
     },
     async pickFile() {
