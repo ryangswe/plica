@@ -1,0 +1,36 @@
+name: Bug
+description: Something looks wrong or doesn't work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you saw. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: file
+    attributes:
+      label: A file that shows it
+      description: >-
+        Attach or paste a small file that reproduces the problem, if you can. Leave out anything private.
+  - type: input
+    id: version
+    attributes:
+      label: Plica version
+      description: Plica → About Plica on macOS, or the release you downloaded.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: System version
+      placeholder: macOS 26.1, Windows 11 24H2, Ubuntu 24.04…
