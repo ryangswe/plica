@@ -65,9 +65,10 @@ pub fn decode_text(bytes: &[u8]) -> Option<(String, &'static Encoding)> {
     } else if is_utf8(bytes) {
         (UTF_8, 0)
     } else {
-        let mut detector = chardetng::EncodingDetector::new();
+        // As in chardetng 0.1: no ISO-2022-JP guess, UTF-8 allowed.
+        let mut detector = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Deny);
         detector.feed(&bytes[..bytes.len().min(1 << 20)], true);
-        (detector.guess(None, true), 0)
+        (detector.guess(None, chardetng::Utf8Detection::Allow), 0)
     };
     let (text, _) = encoding.decode_without_bom_handling(&bytes[skip..]);
     Some((text.into_owned(), encoding))
