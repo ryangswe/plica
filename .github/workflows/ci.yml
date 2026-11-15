@@ -28,6 +28,10 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - name: Release plan (versions agree; a new version has a dated CHANGELOG section)
+        run: |
+          git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##' | grep -v '\^{}$' > "$RUNNER_TEMP/tags.txt" || true
+          node --experimental-strip-types scripts/release-plan.ts "$RUNNER_TEMP/tags.txt" "$RUNNER_TEMP/notes.md"
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
