@@ -59,7 +59,7 @@ jobs:
         with:
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: "Plica ${{ github.ref_name }}"
-          releaseBody: "See the README for install notes (the app is not code-signed yet)."
+          releaseBody: "What changed: see CHANGELOG.md. The app isn't code-signed, so the first launch shows a warning; the README's Install section says how to open it."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

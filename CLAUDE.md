@@ -4,7 +4,7 @@ Cross-platform read-only viewer for Markdown and other dev files (Tauri 2 + Type
 How the code is organized, tested and released: ARCHITECTURE.md.
 Maintainers: status, roadmap and product decisions live in the private `plica-docs` repo, cloned next to
 this one (`~/Workspace/plica-docs`). If you have it, **read its HANDOFF.md first**; record decisions in its
-PRODUCT.md. Never copy those notes into this repo, which will be public.
+PRODUCT.md. Never copy those notes into this repo, which is public.
 
 ## Commands
 

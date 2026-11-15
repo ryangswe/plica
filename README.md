@@ -1,24 +1,38 @@
-# Plica
+<p align="center">
+  <img src="src-tauri/icons/128x128@2x.png" width="96" alt="">
+</p>
+
+<h1 align="center">Plica</h1>
+
+<p align="center">
+  <a href="https://github.com/ryangswe/plica/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ryangswe/plica?label=release"></a>
+  <a href="https://github.com/ryangswe/plica/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ryangswe/plica/ci.yml?branch=main&label=CI"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey">
+</p>
 
 **Double-click a Markdown file and actually read it.**
 
-Plica is a tiny, free, open-source viewer for the text files developers deal with every day. It opens
-Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, instantly, without an IDE. Press
-<kbd>Cmd</kbd>/<kbd>Ctrl</kbd> + <kbd>/</kbd> to flip to the raw source and back, like GitHub's Preview / Code tabs.
+Plica is a small, free viewer for the text files developers read every day. It opens Markdown, JSON, CSV,
+Jupyter notebooks, logs, diffs and more **rendered**, instantly, without an IDE. Press
+<kbd>Cmd</kbd>/<kbd>Ctrl</kbd> + <kbd>/</kbd> to flip to the raw source and back, like GitHub's Preview and Code
+tabs.
 
 <p align="center">
-  <img src="docs/screenshots/01-markdown.png" width="49%" alt="Markdown preview">
-  <img src="docs/screenshots/02-markdown-raw.png" width="49%" alt="Same file, raw">
+  <img src="docs/screenshots/01-markdown.png" width="49%" alt="A Markdown file rendered, with its table of contents">
+  <img src="docs/screenshots/02-markdown-raw.png" width="49%" alt="The same file as raw source with line numbers">
 </p>
 
-- **Fast and small.** Built with [Tauri](https://tauri.app): it uses the web engine your OS already has, so
-  the app is a few MB instead of a 150 MB Electron bundle.
-- **Opens like any other file.** Set it as the default app for `.md` (and friends) and double-click.
-- **Read-only and safe.** Files are untrusted: scripts never run, HTML is sanitized, HTML pages preview in a sandbox.
-- **Private.** No telemetry, no accounts. Remote images in a file (badges, tracking pixels) load only when you
-  say so: **Load once**, or **Always load** (macOS: View → Load Remote Images).
-- **Live reload.** Edit the file in your editor; the view updates on save (great for logs with *Follow* on).
-- **Works on macOS, Windows and Linux.**
+- **Small and fast.** Built with [Tauri](https://tauri.app), it uses the web engine your OS already has: the
+  macOS app is about 5 MB, not a 150 MB Electron bundle.
+- **Opens like any other file.** Make it the default app for `.md` (and friends) and double-click.
+- **Read-only and careful.** File content is treated as untrusted: scripts never run, HTML is sanitized, and HTML
+  pages preview in a sandbox.
+- **Private.** No telemetry, no accounts, no update checks. Remote images in a file (badges, tracking pixels)
+  load only when you say so.
+- **Live reload.** Edit the file in your editor and the view updates when you save.
+- **Finds what your coding agent just wrote.** File → Recent Changes lists the Markdown and text files changed
+  this week, newest first, including plans in `~/.claude/plans` and notes in git worktrees.
 
 ## What it renders
 
@@ -34,57 +48,34 @@ Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, insta
 | SVG, HTML | Image / sandboxed page preview |
 | Anything else that's text | Syntax-highlighted source with line numbers |
 
+Text in UTF-16, Windows-1252, Shift_JIS and other legacy encodings is detected; click the encoding in the top bar
+to pick another one if the characters look wrong.
+
 <p align="center">
-  <img src="docs/screenshots/07-log.png" width="49%" alt="Log view">
-  <img src="docs/screenshots/05-notebook.png" width="49%" alt="Notebook view">
+  <img src="docs/screenshots/07-log.png" width="49%" alt="A log file colored by level, with filters">
+  <img src="docs/screenshots/05-notebook.png" width="49%" alt="A Jupyter notebook with outputs">
 </p>
-
-## Keyboard
-
-| Keys | Action |
-|---|---|
-| <kbd>Cmd/Ctrl</kbd> <kbd>/</kbd> | Toggle Preview ↔ Raw |
-| <kbd>Cmd/Ctrl</kbd> <kbd>F</kbd>, <kbd>G</kbd>, <kbd>Shift</kbd> <kbd>G</kbd> | Find in file, next match, previous match |
-| <kbd>Cmd/Ctrl</kbd> <kbd>O</kbd> | Open a file |
-| <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Reload |
-| <kbd>Shift</kbd> <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Recent changes: Markdown and text files changed this week |
-| <kbd>Cmd/Ctrl</kbd> <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | Zoom |
-| <kbd>Alt</kbd> <kbd>←</kbd> or <kbd>Cmd/Ctrl</kbd> <kbd>[</kbd> | Back (after following a link to another file) |
-| <kbd>Ctrl</kbd> <kbd>Cmd</kbd> <kbd>S</kbd> (macOS), <kbd>Ctrl</kbd> <kbd>B</kbd> | Show or hide the file list |
-
-On macOS everything is also in the menu bar, plus:
-
-| Keys | Action |
-|---|---|
-| <kbd>Cmd</kbd> <kbd>E</kbd> | Open in your editor (VS Code, Cursor, Zed…; pick one under File → Open in Other Editor) |
-| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>C</kbd> / <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>C</kbd> | Copy the file's source / its path |
-| <kbd>Cmd</kbd> <kbd>1</kbd>…<kbd>9</kbd>, <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Switch tabs (Window → Merge All Windows to put windows in tabs) |
-| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>M</kbd> | Merge All Windows |
-
-**Several files or a folder:** select files in Finder and open them, drop them on Plica, or use **File → Open
-Folder…** (Shift+Cmd+O, or drop a folder). You get one window with the files listed on the left in Finder's name
-order; click one (or use the arrow keys) to show it. To give a file a window of its own, Cmd-click it, drag it
-out of the window, or right-click it → Open in New Window. Only the folder's own text files are listed:
-subfolders, hidden files and files that aren't text are left out. Prefer tabs? On macOS, Window → **Open Groups
-of Files as Tabs** opens one tab per file instead.
-
-**Recent changes:** **File → Recent Changes** (Shift+Cmd+R, or Ctrl+Shift+R; also on the start screen) lists the
-Markdown and text files changed in the last 7 days, newest first, with their folder and when they changed. Handy
-for finding what a coding agent just wrote: a plan in `~/.claude/plans`, notes in a worktree. It looks in
-`~/.claude/plans` and the usual code folders (`~/Workspace`, `~/Projects`, `~/Developer`, `~/code`…), skipping
-dependencies and build output. Files written all at once (a checkout or a copy) are left out. To pick the folders,
-add `"recentFolders": ["~/work", "~/notes"]` to Plica's `settings.json`. Run it again to refresh the list.
-
-If a file's characters look wrong, click its encoding in the top bar (or File → Reopen with Encoding) to pick another.
 
 ## Install
 
-Download the installer for your OS from the [Releases](../../releases) page.
+Download the file for your system from the [latest release](https://github.com/ryangswe/plica/releases/latest):
 
-> **The app isn't code-signed yet**, so the first launch shows a warning:
-> - **macOS:** right-click Plica.app → **Open** → **Open**. If macOS says the app is "damaged", run
->   `xattr -cr /Applications/Plica.app` once.
-> - **Windows:** SmartScreen → **More info** → **Run anyway**.
+| System | File |
+|---|---|
+| macOS, Apple Silicon | `Plica_<version>_aarch64.dmg` |
+| macOS, Intel | `Plica_<version>_x64.dmg` |
+| Windows | `Plica_<version>_x64-setup.exe` (or the `.msi`) |
+| Linux | `.AppImage`, `.deb` or `.rpm` |
+
+The app isn't code-signed (signing costs a yearly fee, and Plica is a free side project), so your system warns
+you the first time you open it:
+
+- **macOS:** open Plica once and close the warning. Then go to **System Settings → Privacy & Security**, scroll
+  down to the message about Plica and click **Open Anyway**. If macOS instead says the app is "damaged", run
+  `xattr -dr com.apple.quarantine /Applications/Plica.app` once in Terminal.
+- **Windows:** in the SmartScreen dialog, click **More info → Run anyway**.
+
+Or build it yourself: see [Development](#development).
 
 ### Make it the default for Markdown
 
@@ -93,26 +84,93 @@ Download the installer for your OS from the [Releases](../../releases) page.
 - **Windows:** right-click a `.md` file → **Open with** → **Choose another app** → Plica → tick **Always**.
 - **Linux:** `xdg-mime default Plica.desktop text/markdown` (or use your file manager's "Open With").
 
-Plica registers itself for Markdown, JSON, CSV/TSV, notebooks, logs, diffs and Mermaid files, so it shows
-up in "Open With" for all of them.
+Plica registers itself for Markdown, JSON, CSV/TSV, notebooks, logs, diffs and Mermaid files, so it shows up in
+"Open With" for all of them.
+
+## Using it
+
+**Several files or a folder.** Select files in Finder or Explorer and open them, or drop files or a folder on
+Plica (on macOS also **File → Open Folder…**). You get one window with the files listed on the left in Finder's
+name order; click one, or use the arrow keys, to show it. To give a file a window of its own, Cmd/Ctrl-click
+it, drag it out of the window, or right-click it → Open in New Window. Only the folder's own text files are
+listed: subfolders, hidden files and files that aren't text are left out. Prefer tabs? On macOS,
+Window → **Open Groups of Files as Tabs** opens one tab per file instead.
+
+<p align="center">
+  <img src="docs/screenshots/08-file-list.png" width="70%" alt="Three files opened together, listed on the left">
+</p>
+
+**Recent changes.** **File → Recent Changes** (<kbd>Shift</kbd> <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd>, or the
+button on the start screen) lists the Markdown and text files
+changed in the last 7 days, newest first, with their folder and when they changed. It looks in
+`~/.claude/plans` and the usual code folders (`~/Workspace`, `~/Projects`, `~/Developer`, `~/code`…), skipping
+dependencies and build output. Files written dozens at a time (a git checkout or a copy) are left out. To choose
+the folders, add `"recentFolders": ["~/work", "~/notes"]` to Plica's `settings.json`. Run it again to refresh
+the list.
+
+**Links.** Web links open in your browser. Links to other files open them in Plica, including the
+`src/main.ts:42` form that coding agents write (the line number is ignored for now).
+
+**Remote images** stay blocked until you click **Load once** or **Always load** (macOS: View → Load Remote
+Images).
+
+### Keyboard
+
+| Keys | Action |
+|---|---|
+| <kbd>Cmd/Ctrl</kbd> <kbd>/</kbd> | Toggle Preview ↔ Raw |
+| <kbd>Cmd/Ctrl</kbd> <kbd>F</kbd>, <kbd>G</kbd>, <kbd>Shift</kbd> <kbd>G</kbd> | Find in file, next match, previous match |
+| <kbd>Cmd/Ctrl</kbd> <kbd>O</kbd> | Open a file |
+| <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Reload |
+| <kbd>Shift</kbd> <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Recent changes |
+| <kbd>Cmd/Ctrl</kbd> <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | Zoom |
+| <kbd>Alt</kbd> <kbd>←</kbd> or <kbd>Cmd/Ctrl</kbd> <kbd>[</kbd> | Back (after following a link to another file) |
+| <kbd>Ctrl</kbd> <kbd>Cmd</kbd> <kbd>S</kbd> (macOS), <kbd>Ctrl</kbd> <kbd>B</kbd> | Show or hide the file list |
+
+On macOS everything is also in the menu bar, plus:
+
+| Keys | Action |
+|---|---|
+| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>O</kbd> | Open a folder |
+| <kbd>Cmd</kbd> <kbd>E</kbd> | Open in your editor (VS Code, Cursor, Zed…; pick one under File → Open in Other Editor) |
+| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>C</kbd> / <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>C</kbd> | Copy the file's source / its path |
+| <kbd>Cmd</kbd> <kbd>1</kbd>…<kbd>9</kbd>, <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Switch tabs (Window → Merge All Windows puts windows in tabs) |
+| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>M</kbd> | Merge All Windows |
 
 ## Development
 
-Requirements: Node 20+, Rust (stable), and on Linux the WebKitGTK libraries
-(`sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`).
+You need Node 20 or later and Rust (stable). On Linux, also the WebKitGTK libraries:
+`sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`.
 
 ```bash
+git clone https://github.com/ryangswe/plica.git
+cd plica
 npm install
 npm run tauri dev          # run the desktop app with hot reload
 npm run dev                # or just the UI in a browser (drag files onto the page)
-npm test                   # unit tests (vitest)
-npm run test:e2e           # browser tests (playwright) – also writes screenshots to test-results/screens
 npm run tauri build        # build installers for your OS into src-tauri/target/release/bundle
 ```
 
-Adding a file type is one file in `src/renderers/` plus a line in `src/renderers/index.ts`. See
-[ARCHITECTURE.md](ARCHITECTURE.md) for how it's built.
+Tests: `npm test` (unit), `npm run test:e2e` (Playwright, Chromium and WebKit), and `cargo test --manifest-path
+src-tauri/Cargo.toml`. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the code is laid out, and adding a file
+type is one file in `src/renderers/` plus a line in `src/renderers/index.ts`.
+
+## How this was built
+
+I built Plica for myself, with heavy use of AI coding tools (Claude Code). It is checked by unit tests, browser
+tests in Chromium and WebKit (which also enforce the app's Content Security Policy), Rust tests, a lint for bug
+patterns, a macOS smoke test of the installed app, and two outside reviews by AI models, not by people. I use it
+every day on macOS. The Windows and Linux builds are built and tested in CI but get little use by hand, so
+reports from those systems are especially welcome.
+
+## Support
+
+I maintain Plica in my spare time. Bug reports are welcome as
+[issues](https://github.com/ryangswe/plica/issues/new/choose); they are read, but there is no promised response
+time and no roadmap. Plica does what I need, so new features are unlikely unless they are small and fit what it
+already does. To help with code, see [CONTRIBUTING.md](CONTRIBUTING.md). To report a security problem, see
+[SECURITY.md](SECURITY.md) instead of opening an issue.
 
 ## License
 
-MIT
+[MIT](LICENSE). Changes by version are in [CHANGELOG.md](CHANGELOG.md).

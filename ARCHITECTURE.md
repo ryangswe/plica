@@ -73,6 +73,10 @@ never `innerHTML` raw file content; no `eval`; keep `script-src 'self'`; links a
 
 ## Releasing
 
-1. Bump `version` in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
-2. Commit, then `git tag v0.1.0 && git push --tags`.
-3. The Release workflow builds everything and creates a **draft** release; review it and publish.
+1. Bump `version` in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` , then run `npm install`
+   and `cargo check --manifest-path src-tauri/Cargo.toml` so both lock files follow.
+2. In `CHANGELOG.md`, rename Unreleased to the new version with today's date, add an empty Unreleased above it,
+   and update the compare links at the bottom.
+3. Commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. The Release workflow builds installers for macOS (Apple Silicon and Intel), Windows and Linux and creates a
+   **draft** release; check it, paste the version's CHANGELOG section into its notes, and publish.
