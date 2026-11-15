@@ -34,6 +34,7 @@ src-tauri/
                          frontend owns are sent to the focused window as `menu` events
   tauri.conf.json        CSP, asset protocol, file associations, bundle settings
   capabilities/          permissions granted to windows (labels w0, w1, ...)
+scripts/release-plan.ts  whether a push to main is a new release, and its notes (used by release.yml and CI)
 tests/
   fixtures/              sample files for every type (also nice for manual testing)
   unit/                  vitest
@@ -73,10 +74,13 @@ never `innerHTML` raw file content; no `eval`; keep `script-src 'self'`; links a
 
 ## Releasing
 
-1. Bump `version` in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` , then run `npm install`
-   and `cargo check --manifest-path src-tauri/Cargo.toml` so both lock files follow.
-2. In `CHANGELOG.md`, rename Unreleased to the new version with today's date, add an empty Unreleased above it,
-   and update the compare links at the bottom.
-3. Commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
-4. The Release workflow builds installers for macOS (Apple Silicon and Intel), Windows and Linux and creates a
-   **draft** release; check it, paste the version's CHANGELOG section into its notes, and publish.
+1. In a pull request, bump `version` in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`,
+   then run `npm install` and `cargo check --manifest-path src-tauri/Cargo.toml` so both lock files follow.
+2. In `CHANGELOG.md`, rename Unreleased to the new version with today's date (`## [X.Y.Z] - YYYY-MM-DD`), add an
+   empty Unreleased above it, and update the compare links at the bottom. CI checks that the three versions
+   agree and that a new version has this section.
+3. Merge. The Release workflow (`scripts/release-plan.ts` decides) creates a **draft** release `vX.Y.Z` with the
+   changelog section as its notes, and builds installers for macOS (Apple Silicon and Intel), Windows and Linux
+   into it (about 6 minutes). Merges that don't change the version release nothing.
+4. Download the macOS `.dmg` from the draft and check it opens through Gatekeeper, then publish. Publishing
+   creates the tag.
