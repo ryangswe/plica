@@ -5,7 +5,7 @@ import { createBrowserHost, createTauriHost, isTauri, type Host } from "./host";
 import { pickRenderer, rawLanguageFor } from "./renderers";
 import { renderRaw } from "./renderers/raw";
 import { el, formatBytes } from "./lib/dom";
-import { hasScheme, resolveRelative, splitFragment } from "./lib/paths";
+import { hasScheme, resolveRelative, splitFragment, stripLineSuffix } from "./lib/paths";
 import { readWithRetry, staleMessage } from "./lib/reload";
 import type { RemotePolicy } from "./lib/sanitize";
 import { createFindBar } from "./find";
@@ -425,15 +425,18 @@ darkQuery.addEventListener("change", () => void render({ keepScroll: true }));
 view.addEventListener("click", (e) => {
   const a = (e.target as HTMLElement).closest("a");
   if (!a) return;
-  const href = a.getAttribute("href");
+  const raw = a.getAttribute("href");
   e.preventDefault();
-  if (!href) return;
+  if (!raw) return;
+  const href = stripLineSuffix(raw);
   if (href.startsWith("#")) {
     scrollToAnchor(splitFragment(href).fragment);
     return;
   }
   if (hasScheme(href)) {
-    if (/^(https?|mailto):/i.test(href)) host.openExternal(href);
+    if (/^(https?|mailto):/i.test(href)) {
+      host.openExternal(href).catch((err: unknown) => showToast(`Couldn't open the link: ${String((err as Error)?.message ?? err)}`, 3500));
+    }
     return;
   }
   if (doc?.path && host.canReadPaths) {

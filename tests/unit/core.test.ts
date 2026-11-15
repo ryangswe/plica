@@ -8,7 +8,7 @@ import { detectLevel, logRenderer } from "../../src/renderers/log";
 import { notebookRenderer } from "../../src/renderers/notebook";
 import { ansiToHtml, stripAnsi } from "../../src/lib/ansi";
 import { splitHighlightedLines, highlight, languageFor } from "../../src/lib/highlight";
-import { resolveRelative, hasScheme, splitFragment } from "../../src/lib/paths";
+import { resolveRelative, hasScheme, splitFragment, stripLineSuffix } from "../../src/lib/paths";
 import { readWithRetry, staleMessage } from "../../src/lib/reload";
 import { blockRemote, guardRemoteHtml } from "../../src/lib/sanitize";
 import { describeCurrent, joinLabels, openDefaultAppsSheet, type DefaultAppsInfo } from "../../src/defaults";
@@ -235,6 +235,20 @@ describe("helpers", () => {
     expect(hasScheme("https://x")).toBe(true);
     expect(hasScheme("C:\\x")).toBe(false);
     expect(hasScheme("docs/a.md")).toBe(false);
+  });
+  it("drops editor-style line suffixes from file links (src/a.ts:42)", () => {
+    expect(stripLineSuffix("src/a.ts:42")).toBe("src/a.ts");
+    expect(stripLineSuffix("README.md:3:7")).toBe("README.md");
+    expect(stripLineSuffix("/abs/a.md:9")).toBe("/abs/a.md");
+    expect(stripLineSuffix("C:\\x\\a.md:9")).toBe("C:\\x\\a.md");
+    expect(hasScheme(stripLineSuffix("README.md:12"))).toBe(false); // was read as a "README.md:" scheme
+    for (const keep of ["https://x.com:8080/a", "mailto:123", "a.md#setup", "a.md", "localhost:3000"]) {
+      expect(stripLineSuffix(keep)).toBe(keep);
+    }
+  });
+  it("lets the opener plugin open web links (without a URL scope it refuses all of them)", () => {
+    const caps = JSON.parse(readFileSync(`${process.cwd()}/src-tauri/capabilities/default.json`, "utf8"));
+    expect(caps.permissions).toContain("opener:allow-default-urls");
   });
   it("picks renderers by extension and file name", () => {
     expect(pickRenderer({ name: "README.MD" }).id).toBe("markdown");

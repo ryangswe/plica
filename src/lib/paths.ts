@@ -14,6 +14,16 @@ export function hasScheme(href: string): boolean {
 }
 
 /**
+ * Drop an editor-style line suffix: "src/a.ts:42" or "a.md:3:7" → "src/a.ts" / "a.md".
+ * Agents such as Claude Code write links this way. Only applies when the part before the
+ * number looks like a file path (has a dot or a slash), so "mailto:123" is left alone.
+ */
+export function stripLineSuffix(href: string): string {
+  const m = /^((?:[a-zA-Z]:[\\/])?[^:]*[./\\][^:]*):\d+(?::\d+)?$/.exec(href);
+  return m ? m[1] : href;
+}
+
+/**
  * Resolve `rel` against the directory of `fromFile`. Strips ?query and #hash.
  * Keeps the separator style of the base path.
  */

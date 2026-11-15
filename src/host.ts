@@ -47,7 +47,7 @@ export interface Host {
   /** Call `onChange` when the file at `path` changes on disk. Replaces any previous watch. */
   watch(path: string, onChange: () => void): void;
   assetUrl(path: string): string | null;
-  openExternal(url: string): void;
+  openExternal(url: string): Promise<void>;
   setTitle(title: string): void;
   /** Open a file in a window of its own; `at` is a screen point to put it at (dragged out of the list). */
   openInNewWindow(path: string, at?: { x: number; y: number }): void;
@@ -186,6 +186,7 @@ export function createBrowserHost(): Host {
     },
     openExternal(url) {
       window.open(url, "_blank", "noopener,noreferrer");
+      return Promise.resolve();
     },
     setTitle(title) {
       document.title = title;
@@ -267,7 +268,7 @@ export async function createTauriHost(): Promise<Host> {
       return convertFileSrc(path);
     },
     openExternal(url) {
-      openUrl(url).catch(() => {});
+      return openUrl(url);
     },
     setTitle(title) {
       win.setTitle(title).catch(() => {});
