@@ -17,7 +17,12 @@ test.beforeEach(async ({ page }, info) => {
   SHOTS = path.resolve("test-results/screens", info.project.name);
   cspViolations = [];
   page.on("console", (m) => {
-    if (m.type() === "error" && /Content Security Policy|Refused to/i.test(m.text())) cspViolations.push(m.text());
+    const text = m.text();
+    // Chromium 158+ reports an inline handler (onerror=...) as soon as DOMPurify parses it with DOMParser, in a
+    // document that never runs it (checked with and without a CSP). It's stripped before anything reaches the
+    // page; the hostile-markdown test checks that directly.
+    if (/^Executing inline event handler/.test(text)) return;
+    if (m.type() === "error" && /Content Security Policy|Refused to/i.test(text)) cspViolations.push(text);
   });
   await page.goto("/");
 });
@@ -88,6 +93,11 @@ test("hostile markdown cannot run scripts or restyle the app", async ({ page }) 
   await page.locator(".markdown-body a", { hasText: "click me" }).click();
   expect(await page.evaluate(() => (window as unknown as { __pwned?: boolean }).__pwned)).toBeUndefined();
   await expect(page.locator(".markdown-body iframe, .markdown-body script, .markdown-body style")).toHaveCount(0);
+  // No inline event handlers (onerror=, onclick=...) survive sanitizing.
+  const handlers = await page.locator(".markdown-body *").evaluateAll((els) =>
+    els.flatMap((el) => [...el.attributes].map((a) => a.name)).filter((n) => n.startsWith("on")),
+  );
+  expect(handlers).toEqual([]);
   await expect(page.locator("body")).toBeVisible();
   await expect(page.locator(".topbar")).toBeVisible();
 });
