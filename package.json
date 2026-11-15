@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "description": "A tiny, fast viewer for Markdown, JSON, CSV, notebooks, logs, diffs and other dev files, with a one-key raw/rendered toggle.",
   "license": "MIT",
+  "homepage": "https://github.com/ryangswe/plica",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryangswe/plica.git"
+  },
+  "bugs": "https://github.com/ryangswe/plica/issues",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,0 +1,25 @@
+# Dependency updates: one grouped pull request a month per ecosystem (npm, Cargo, GitHub Actions),
+# checked by CI like any other pull request.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns: ["*"]
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: monthly
+    groups:
+      cargo:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
