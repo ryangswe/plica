@@ -106,13 +106,15 @@ function showToast(msg: string, ms = 1600) {
 function emptyState(): HTMLElement {
   const openLink = el("button", { class: "primary" }, "Open a file");
   openLink.addEventListener("click", () => void pick());
+  const recentLink = el("button", { title: `Markdown and text files changed this week (${MOD}${isMac ? "⇧" : "Shift+"}R)` }, "Recent changes");
+  recentLink.addEventListener("click", () => host.recentChanges?.());
   return el(
     "div",
     { class: "empty" },
     el("img", { class: "empty-mark", src: appIconUrl, alt: "", width: "72", height: "72" }),
     el("h1", {}, "Plica"),
     el("p", {}, "Read Markdown and developer files. Drop files or a folder here, or"),
-    openLink,
+    host.recentChanges ? el("div", { class: "empty-actions" }, openLink, recentLink) : openLink,
     el("p", { class: "muted small" }, "Markdown, JSON, CSV, notebooks, logs, diffs, Mermaid and any text or code file."),
     el(
       "div",
@@ -472,6 +474,9 @@ document.addEventListener("keydown", (e) => {
   } else if (mod && key === "f") {
     e.preventDefault();
     if (doc) find.show();
+  } else if (mod && e.shiftKey && key === "r") {
+    e.preventDefault();
+    host.recentChanges?.();
   } else if (mod && key === "r" && doc?.path) {
     e.preventDefault();
     void openPath(doc.path, { pushHistory: false });

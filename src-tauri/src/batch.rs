@@ -23,11 +23,20 @@ pub struct Plan {
 }
 
 /// The files a window lists in its sidebar.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FileList {
     /// Set when the list is a folder's files (it goes in Open Recent, and opening it again finds it).
     pub folder: Option<PathBuf>,
     pub files: Vec<PathBuf>,
+    /// Set for File → Recent Changes (recent.rs): where each file is and when it changed, in `files` order.
+    pub recent: Option<Vec<Recent>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Recent {
+    pub detail: String,
+    /// Milliseconds since 1970.
+    pub modified: u64,
 }
 
 /// What the page gets: a heading and the files.
@@ -41,11 +50,18 @@ pub struct ListPayload {
 struct ListItem {
     name: String,
     path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modified: Option<u64>,
 }
 
 impl FileList {
     /// The folder's name; for files chosen together, their folder's name when they share one.
     pub fn title(&self) -> String {
+        if self.recent.is_some() {
+            return "Recent Changes".into();
+        }
         if let Some(f) = &self.folder {
             return name(f);
         }
@@ -57,12 +73,23 @@ impl FileList {
     }
 
     pub fn payload(&self) -> ListPayload {
-        let items = self.files.iter().map(|f| ListItem { name: name(f), path: f.to_string_lossy().into_owned() }).collect();
+        let items = self
+            .files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                let r = self.recent.as_ref().and_then(|r| r.get(i));
+                ListItem { name: name(f), path: f.to_string_lossy().into_owned(), detail: r.map(|r| r.detail.clone()), modified: r.map(|r| r.modified) }
+            })
+            .collect();
         ListPayload { title: self.title(), items }
     }
 
-    /// The same folder, or the same files.
+    /// The same folder, or the same files; any two Recent Changes lists (opening it again refreshes it).
     pub fn same_as(&self, other: &FileList) -> bool {
+        if self.recent.is_some() || other.recent.is_some() {
+            return self.recent.is_some() && other.recent.is_some();
+        }
         match (&self.folder, &other.folder) {
             (Some(a), Some(b)) => crate::canon(a) == crate::canon(b),
             (None, None) => self.files == other.files,
@@ -219,7 +246,7 @@ fn open_plan(app: &AppHandle, plan: Plan, target: Option<String>) {
                 None
             }
         },
-        _ => crate::open_list(app, FileList { folder: plan.folder, files: plan.files }, target),
+        _ => crate::open_list(app, FileList { folder: plan.folder, files: plan.files, ..Default::default() }, target),
     };
     if let Some(msg) = message {
         crate::notify(app, label.as_deref(), &msg);
@@ -260,14 +287,14 @@ mod tests {
     #[test]
     fn list_titles_and_identity() {
         let files = |v: &[&str]| v.iter().map(PathBuf::from).collect::<Vec<_>>();
-        let folder = FileList { folder: Some("/x/docs".into()), files: files(&["/x/docs/a.md"]) };
+        let folder = FileList { folder: Some("/x/docs".into()), files: files(&["/x/docs/a.md"]), ..Default::default() };
         assert_eq!(folder.title(), "docs");
-        let together = FileList { folder: None, files: files(&["/x/notes/a.md", "/x/notes/b.md"]) };
+        let together = FileList { folder: None, files: files(&["/x/notes/a.md", "/x/notes/b.md"]), ..Default::default() };
         assert_eq!(together.title(), "notes");
-        let mixed = FileList { folder: None, files: files(&["/x/a.md", "/y/b.md"]) };
+        let mixed = FileList { folder: None, files: files(&["/x/a.md", "/y/b.md"]), ..Default::default() };
         assert_eq!(mixed.title(), "Files");
         // Opening the same folder again finds the window that has it, even if its files changed.
-        assert!(folder.same_as(&FileList { folder: Some("/x/docs".into()), files: vec![] }));
+        assert!(folder.same_as(&FileList { folder: Some("/x/docs".into()), files: vec![], ..Default::default() }));
         assert!(!folder.same_as(&together));
         assert!(together.same_as(&together.clone()));
         let p = together.payload();

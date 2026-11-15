@@ -8,6 +8,10 @@ export interface ListItem {
   name: string;
   path: string | null;
   load?: () => Promise<FileDoc>;
+  /** Recent Changes: the folder it's in, shown under the name. */
+  detail?: string;
+  /** Recent Changes: when it changed (ms since 1970). */
+  modified?: number;
 }
 
 /** A folder, or several files opened together. */
@@ -21,6 +25,16 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "bas
 /** Finder's name order: case-insensitive, numbers by value ("2 setup" before "10 faq"). */
 export function sortByName<T extends { name: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => collator.compare(a.name, b.name));
+}
+
+/** "just now", "5m ago", "3h ago", "yesterday", "4d ago". */
+export function ago(ms: number, now = Date.now()): string {
+  const min = Math.floor((now - ms) / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h ago`;
+  return h < 48 ? "yesterday" : `${Math.floor(h / 24)}d ago`;
 }
 
 export interface Sidebar {
@@ -87,7 +101,14 @@ export function createSidebar(actions: SidebarActions): Sidebar {
       title.title = list.title;
       count.textContent = String(items.length);
       buttons = items.map((item) => {
-        const b = el("button", { class: "sidebar-item", title: item.path ?? item.name, "data-key": item.key }, item.name);
+        const tip = item.modified ? `${item.path ?? item.name}\nChanged ${new Date(item.modified).toLocaleString()}` : (item.path ?? item.name);
+        const b = el("button", { class: "sidebar-item", title: tip, "data-key": item.key }, item.name);
+        if (item.detail !== undefined || item.modified) {
+          const when = item.modified ? ago(item.modified) : "";
+          const meta = [item.detail, when].filter(Boolean).join(" · ");
+          b.replaceChildren(el("span", { class: "sidebar-name" }, item.name), el("span", { class: "sidebar-meta" }, meta));
+          b.classList.add("two-line");
+        }
         b.addEventListener("click", (e) => {
           if ((e.metaKey || e.ctrlKey) && item.path) return actions.openNew(item);
           b.focus(); // WebKit doesn't focus buttons on click; keep the arrow keys in the list

@@ -16,7 +16,7 @@ import { countRemoteRefs } from "../../src/renderers/simple";
 import { pickRenderer } from "../../src/renderers";
 import { renderRaw } from "../../src/renderers/raw";
 import type { FileDoc, RenderContext } from "../../src/types";
-import { createSidebar, droppedOutside, sortByName, type ListItem } from "../../src/sidebar";
+import { ago, createSidebar, droppedOutside, sortByName, type ListItem } from "../../src/sidebar";
 
 const fixture = (name: string) => readFileSync(`${process.cwd()}/tests/fixtures/${name}`, "utf8");
 const doc = (name: string, text = fixture(name)): FileDoc => ({ path: `/tmp/fx/${name}`, name, text, size: text.length, binary: false, truncated: false, encoding: "UTF-8" });
@@ -460,6 +460,32 @@ describe("sidebar", () => {
     expect(droppedOutside({ screenX: 950, screenY: 300 }, win)).toBe(true);
     expect(droppedOutside({ screenX: 500, screenY: 20 }, win)).toBe(true);
     expect(droppedOutside({ screenX: 99, screenY: 300 }, win)).toBe(true);
+  });
+
+  it("says how long ago a file changed", () => {
+    const now = Date.UTC(2026, 10, 14, 12);
+    expect(ago(now - 20_000, now)).toBe("just now");
+    expect(ago(now - 5 * 60_000, now)).toBe("5m ago");
+    expect(ago(now - 3 * 3_600_000, now)).toBe("3h ago");
+    expect(ago(now - 30 * 3_600_000, now)).toBe("yesterday");
+    expect(ago(now - 4 * 86_400_000, now)).toBe("4d ago");
+  });
+
+  it("shows where and when for Recent Changes items, in the order given", () => {
+    const sb = createSidebar({ pick: () => {}, openNew: () => {}, menu: () => false, openChange: () => {} });
+    const now = Date.now();
+    sb.setList({
+      title: "Recent Changes",
+      items: [
+        { key: "/w/z.md", name: "z.md", path: "/w/z.md", detail: "plica/docs", modified: now - 120_000 },
+        { key: "/w/a.md", name: "a.md", path: "/w/a.md", detail: "~/.claude/plans", modified: now - 7_200_000 },
+      ],
+    });
+    const rows = [...sb.el.querySelectorAll(".sidebar-item")];
+    expect(rows.map((b) => b.querySelector(".sidebar-name")?.textContent)).toEqual(["z.md", "a.md"]); // not re-sorted by name
+    expect(rows.map((b) => b.querySelector(".sidebar-meta")?.textContent)).toEqual(["plica/docs · 2m ago", "~/.claude/plans · 2h ago"]);
+    sb.setList({ title: "d", items: [{ key: "/d/a.md", name: "a.md", path: "/d/a.md" }] });
+    expect(sb.el.querySelector(".sidebar-meta")).toBeNull(); // plain lists stay one line
   });
 
   it("sorts names like Finder: case-insensitive, numbers by value", () => {

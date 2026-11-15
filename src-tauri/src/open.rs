@@ -117,7 +117,9 @@ fn window_listing(windows: &HashMap<String, WindowState>, path: Option<&Path>, s
         .iter()
         .filter(|(_, w)| {
             let Some(list) = &w.list else { return false };
-            path.is_some_and(|p| list.files.iter().any(|f| canon(f) == canon(p))) || same_as.is_some_and(|other| list.same_as(other))
+            // A file opened from Finder doesn't go to the Recent Changes window just because it's listed there.
+            let lists_it = list.recent.is_none() && path.is_some_and(|p| list.files.iter().any(|f| canon(f) == canon(p)));
+            lists_it || same_as.is_some_and(|other| list.same_as(other))
         })
         .map(|(label, _)| label.clone())
         .min()

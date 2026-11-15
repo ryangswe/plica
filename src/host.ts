@@ -57,6 +57,14 @@ export interface Host {
   contextMenu(items: { text: string; action: () => void }[], x: number, y: number): boolean;
   /** Bring the n-th native tab (1–9, 9 = last) of this window forward. macOS desktop only. */
   selectTab(n: number): void;
+  /** List recently changed Markdown and text files (File → Recent Changes). Desktop only. */
+  recentChanges?(): void;
+}
+
+/** A file list from Rust (batch.rs `ListPayload`); Recent Changes items also say where and when. */
+interface ListPayload {
+  title: string;
+  items: { name: string; path: string; detail?: string; modified?: number }[];
 }
 
 interface RawFile {
@@ -221,12 +229,12 @@ export async function createTauriHost(): Promise<Host> {
       await win.listen<{ tabBarInset: number; fullscreen: boolean }>("window-chrome", (e) => chrome(e.payload));
       invoke("resend_window_chrome").catch(() => {}); // macOS only; the first report may predate us
       await win.listen<string>("open-path", (e) => openPath(e.payload));
-      const toList = (p: { title: string; items: { name: string; path: string }[] }): FileList => ({
+      const toList = (p: ListPayload): FileList => ({
         title: p.title,
-        items: p.items.map((i) => ({ key: i.path, name: i.name, path: i.path })),
+        items: p.items.map((i) => ({ key: i.path, name: i.name, path: i.path, detail: i.detail, modified: i.modified })),
       });
       // Sent before the "open-path" for its first file.
-      await win.listen<{ title: string; items: { name: string; path: string }[] }>("file-list", (e) => list(toList(e.payload), false));
+      await win.listen<ListPayload>("file-list", (e) => list(toList(e.payload), false));
       await listen<boolean>("remote-content", (e) => remoteContent(e.payload)); // app-wide broadcast
       await win.listen<string>("menu", (e) => command(e.payload));
       await win.listen<string>("notice", (e) => notice(e.payload));
@@ -245,7 +253,7 @@ export async function createTauriHost(): Promise<Host> {
             .catch((err) => error(String(err)));
         }
       });
-      const initialList = await invoke<{ title: string; items: { name: string; path: string }[] } | null>("file_list").catch(() => null);
+      const initialList = await invoke<ListPayload | null>("file_list").catch(() => null);
       if (initialList) list(toList(initialList), false);
       const initial = await invoke<string | null>("take_initial_file");
       if (initial) openPath(initial);
@@ -278,6 +286,9 @@ export async function createTauriHost(): Promise<Host> {
     },
     reveal(path) {
       revealItemInDir(path).catch(() => {});
+    },
+    recentChanges() {
+      invoke("recent_changes").catch(() => {});
     },
     contextMenu(items, x, y) {
       void (async () => {

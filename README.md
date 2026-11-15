@@ -47,6 +47,7 @@ Markdown, JSON, CSV, Jupyter notebooks, logs, diffs and more **rendered**, insta
 | <kbd>Cmd/Ctrl</kbd> <kbd>F</kbd>, <kbd>G</kbd>, <kbd>Shift</kbd> <kbd>G</kbd> | Find in file, next match, previous match |
 | <kbd>Cmd/Ctrl</kbd> <kbd>O</kbd> | Open a file |
 | <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Reload |
+| <kbd>Shift</kbd> <kbd>Cmd/Ctrl</kbd> <kbd>R</kbd> | Recent changes: Markdown and text files changed this week |
 | <kbd>Cmd/Ctrl</kbd> <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | Zoom |
 | <kbd>Alt</kbd> <kbd>←</kbd> or <kbd>Cmd/Ctrl</kbd> <kbd>[</kbd> | Back (after following a link to another file) |
 | <kbd>Ctrl</kbd> <kbd>Cmd</kbd> <kbd>S</kbd> (macOS), <kbd>Ctrl</kbd> <kbd>B</kbd> | Show or hide the file list |
@@ -66,6 +67,13 @@ order; click one (or use the arrow keys) to show it. To give a file a window of 
 out of the window, or right-click it → Open in New Window. Only the folder's own text files are listed:
 subfolders, hidden files and files that aren't text are left out. Prefer tabs? On macOS, Window → **Open Groups
 of Files as Tabs** opens one tab per file instead.
+
+**Recent changes:** **File → Recent Changes** (Shift+Cmd+R, or Ctrl+Shift+R; also on the start screen) lists the
+Markdown and text files changed in the last 7 days, newest first, with their folder and when they changed. Handy
+for finding what a coding agent just wrote: a plan in `~/.claude/plans`, notes in a worktree. It looks in
+`~/.claude/plans` and the usual code folders (`~/Workspace`, `~/Projects`, `~/Developer`, `~/code`…), skipping
+dependencies and build output. Files written all at once (a checkout or a copy) are left out. To pick the folders,
+add `"recentFolders": ["~/work", "~/notes"]` to Plica's `settings.json`. Run it again to refresh the list.
 
 If a file's characters look wrong, click its encoding in the top bar (or File → Reopen with Encoding) to pick another.
 

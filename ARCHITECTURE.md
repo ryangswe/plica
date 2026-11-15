@@ -23,6 +23,8 @@ src-tauri/
   src/files.rs           reading files for the frontend (size cap, binary, encodings); which watch events matter
   src/batch.rs           several files / a folder at once: name order, skip binaries; one window whose
                          file list the frontend shows in its sidebar (src/sidebar.ts)
+  src/recent.rs          File → Recent Changes: walk the code folders for docs changed this week, drop
+                         checkout bursts, newest first, as a file list with folder + time
   src/encoding.rs        bytes → text (BOM, UTF-16, UTF-8, legacy-encoding guess)
   src/defaults.rs        which app opens each file type; make Plica the default (macOS: NSWorkspace + UTType)
   src/chrome.rs          macOS: tells each window when the tab bar shows or it goes full screen (the toolbar

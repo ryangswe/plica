@@ -47,6 +47,12 @@ pub fn groups_as_tabs(app: &AppHandle) -> bool {
     read(app).get("groupsAsTabs").and_then(|v| v.as_bool()).unwrap_or(false)
 }
 
+/// Folders File → Recent Changes looks in (`recentFolders`, paths with `~` allowed); None for the defaults.
+pub fn recent_folders(app: &AppHandle) -> Option<Vec<String>> {
+    let v = read(app).get("recentFolders")?.as_array()?.iter().filter_map(|s| s.as_str().map(str::to_string)).collect();
+    Some(v)
+}
+
 #[tauri::command]
 pub fn get_remote_content(app: AppHandle) -> bool {
     remote_content(&app)

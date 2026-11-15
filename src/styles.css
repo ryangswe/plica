@@ -229,6 +229,9 @@ mark.find-hit.current { background: var(--mark-current); color: #000; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar-item.two-line { padding: 3px 8px; }
+.sidebar-item.two-line > span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-meta { font-size: 0.78em; color: var(--fg-muted); font-weight: 400; }
 .sidebar-item:hover { background: var(--bg-sunk); }
 .sidebar-item[aria-current="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .sidebar-item:focus-visible { outline-offset: -2px; }
@@ -339,6 +342,8 @@ img.remote-blocked { display: inline-block; min-width: 16px; min-height: 16px; b
 .empty-mark { width: 72px; height: 72px; margin-bottom: 4px; filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.18)); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 5px 16px; margin: 6px 0 14px; }
 button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+.empty-actions { display: flex; gap: 8px; }
+.empty-actions > button { margin: 6px 0 14px; padding: 5px 16px; }
 .shortcuts { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
 
 /* ---------- Raw / code view ---------- */

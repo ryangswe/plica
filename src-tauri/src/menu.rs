@@ -202,6 +202,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&MenuItemBuilder::with_id("open", "Open…").accelerator("CmdOrCtrl+O").build(app)?)
         .item(&MenuItemBuilder::with_id("open-folder", "Open Folder…").accelerator("CmdOrCtrl+Shift+O").build(app)?)
         .item(&open_recent)
+        .item(&MenuItemBuilder::with_id("recent-changes", "Recent Changes").accelerator("CmdOrCtrl+Shift+R").build(app)?)
         .separator()
         .item(&open_in)
         .item(&open_with)
@@ -319,6 +320,11 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
                     crate::batch::open(&handle, vec![dir], None);
                 }
             });
+        }
+        "recent-changes" => {
+            let handle = app.clone();
+            let from = app.webview_windows().into_iter().find(|(_, w)| w.is_focused().unwrap_or(false)).map(|(l, _)| l);
+            std::thread::spawn(move || crate::recent::open(&handle, from));
         }
         "toggle-groups-as-tabs" => {
             let on = app.state::<GroupsAsTabsToggle>().0.is_checked().unwrap_or(false);

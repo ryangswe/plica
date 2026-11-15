@@ -26,6 +26,7 @@ mod files;
 #[cfg(target_os = "macos")]
 mod menu;
 mod open;
+mod recent;
 mod settings;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -129,7 +130,7 @@ fn watch_file(window: WebviewWindow, state: State<AppState>, path: String) -> Re
     let entry = windows.entry(window.label().to_string()).or_default();
     // Browsing a folder's files: the folder is in Open Recent already, not each file.
     #[cfg(target_os = "macos")]
-    let in_folder = entry.list.as_ref().is_some_and(|l| l.folder.is_some() && l.files.contains(&target));
+    let in_folder = entry.list.as_ref().is_some_and(|l| (l.folder.is_some() || l.recent.is_some()) && l.files.contains(&target));
     entry.current = Some(target);
     entry.watcher = Some(watcher); // drops (stops) the previous watcher
     drop(windows);
@@ -325,6 +326,7 @@ pub fn run() {
             files::read_file,
             take_initial_file,
             file_list,
+            recent::recent_changes,
             take_pending_command,
             watch_file,
             open_window,
