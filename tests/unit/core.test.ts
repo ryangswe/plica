@@ -250,6 +250,12 @@ describe("helpers", () => {
     const caps = JSON.parse(readFileSync(`${process.cwd()}/src-tauri/capabilities/default.json`, "utf8"));
     expect(caps.permissions).toContain("opener:allow-default-urls");
   });
+  it("signs the macOS app ad hoc, so a downloaded copy isn't reported as damaged", () => {
+    // Without a signing identity only the executable is signed (by the linker), not the bundle, and
+    // Gatekeeper calls a downloaded copy "damaged" instead of offering Open Anyway.
+    const conf = JSON.parse(readFileSync(`${process.cwd()}/src-tauri/tauri.conf.json`, "utf8"));
+    expect(conf.bundle.macOS.signingIdentity).toBe("-");
+  });
   it("picks renderers by extension and file name", () => {
     expect(pickRenderer({ name: "README.MD" }).id).toBe("markdown");
     expect(pickRenderer({ name: "x.ipynb" }).id).toBe("notebook");

@@ -1,6 +1,6 @@
 [package]
 name = "plica"
-version = "0.1.0"
+version = "0.1.1"
 description = "A tiny, fast viewer for Markdown and other dev files"
 license = "MIT"
 repository = "https://github.com/ryangswe/plica"
