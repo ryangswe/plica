@@ -23,7 +23,7 @@ notify = "8"
 serde_json = "1"
 # Text encodings (Firefox's decoder and detector): UTF-16, Windows-1252, Shift_JIS... ~215 KB.
 encoding_rs = "0.8"
-chardetng = "0.1"
+chardetng = "1.0"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"
