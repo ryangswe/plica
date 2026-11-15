@@ -5,6 +5,13 @@ All notable changes to Plica are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-15
+
+### Fixed
+
+- macOS: a downloaded copy of Plica no longer says it's "damaged and can't be opened". The app bundle is now
+  signed ad hoc, so macOS offers **Open Anyway** in System Settings → Privacy & Security instead.
+
 ## [0.1.0] - 2026-11-14
 
 The first release.
@@ -24,5 +31,6 @@ The first release.
 - macOS: native menu bar and tabs, Open Recent, Open in Editor, Default Apps for choosing which file types
   Plica opens, and staying open after the last window closes.
 
-[Unreleased]: https://github.com/ryangswe/plica/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ryangswe/plica/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/ryangswe/plica/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ryangswe/plica/releases/tag/v0.1.0

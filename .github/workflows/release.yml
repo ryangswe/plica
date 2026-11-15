@@ -63,6 +63,10 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+      - name: Check the macOS app's signature
+        # A bundle that fails this is reported as "damaged" when downloaded (see tauri.conf.json signingIdentity).
+        if: runner.os == 'macOS'
+        run: codesign --verify --deep --strict -vv src-tauri/target/*/release/bundle/macos/Plica.app
       - uses: actions/upload-artifact@v4
         with:
           name: plica-${{ matrix.os }}-${{ matrix.rust_targets || 'native' }}
