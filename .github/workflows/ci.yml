@@ -32,6 +32,8 @@ jobs:
         run: |
           git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##' | grep -v '\^{}$' > "$RUNNER_TEMP/tags.txt" || true
           node --experimental-strip-types scripts/release-plan.ts "$RUNNER_TEMP/tags.txt" "$RUNNER_TEMP/notes.md"
+      - name: Lint the macOS install script
+        run: shellcheck scripts/install-macos.sh
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v7

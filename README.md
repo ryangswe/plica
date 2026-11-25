@@ -58,7 +58,17 @@ to pick another one if the characters look wrong.
 
 ## Install
 
-Download the file for your system from the [latest release](https://github.com/ryangswe/plica/releases/latest):
+**macOS:** paste this into Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ryangswe/plica/main/scripts/install-macos.sh | bash
+```
+
+It downloads the latest release for your Mac, checks it against the SHA-256 that GitHub lists for it, and installs
+it in `/Applications`, so it opens without a security warning. ([Read the script](scripts/install-macos.sh) first
+if you like.)
+
+**Or download** the file for your system from the [latest release](https://github.com/ryangswe/plica/releases/latest):
 
 | System | File |
 |---|---|
@@ -67,12 +77,12 @@ Download the file for your system from the [latest release](https://github.com/r
 | Windows | `Plica_<version>_x64-setup.exe` (or the `.msi`) |
 | Linux | `.AppImage`, `.deb` or `.rpm` |
 
-The app isn't code-signed (signing costs a yearly fee, and Plica is a free side project), so your system warns
-you the first time you open it:
+Plica isn't notarized by Apple or signed for Windows (both cost a yearly fee, and Plica is a free side project),
+so a downloaded copy shows a warning the first time it opens:
 
-- **macOS:** open Plica once and close the warning. Then go to **System Settings → Privacy & Security**, scroll
-  down to the message about Plica and click **Open Anyway**. If macOS instead says the app is "damaged", run
-  `xattr -dr com.apple.quarantine /Applications/Plica.app` once in Terminal.
+- **macOS:** "Apple could not verify "Plica" is free of malware…". Click **Done**, go to **System Settings →
+  Privacy & Security**, and click **Open Anyway** next to the message about Plica. You only do this once. (Or run
+  `xattr -dr com.apple.quarantine /Applications/Plica.app` in Terminal, which skips it.)
 - **Windows:** in the SmartScreen dialog, click **More info → Run anyway**.
 
 Or build it yourself: see [Development](#development).
