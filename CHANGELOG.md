@@ -5,6 +5,11 @@ All notable changes to Plica are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- macOS: a one-line install from Terminal (`scripts/install-macos.sh`). It checks the download's SHA-256 and
+  installs Plica without the "could not verify … free of malware" warning a browser download gets.
+
 ## [0.1.1] - 2026-11-15
 
 ### Fixed

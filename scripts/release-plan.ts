@@ -52,6 +52,10 @@ function unwrap(markdown: string): string {
 function installNotes(version: string): string {
   return `### Install
 
+macOS, with no security warning: \`curl -fsSL https://raw.githubusercontent.com/ryangswe/plica/main/scripts/install-macos.sh | bash\`
+
+Or download:
+
 | System | File |
 |---|---|
 | macOS, Apple Silicon | \`Plica_${version}_aarch64.dmg\` |
@@ -59,7 +63,7 @@ function installNotes(version: string): string {
 | Windows | \`Plica_${version}_x64-setup.exe\` (or the \`.msi\`) |
 | Linux | \`.AppImage\`, \`.deb\` or \`.rpm\` |
 
-The app isn't code-signed, so the first launch shows a warning. On macOS, open Plica once, then go to **System Settings → Privacy & Security** and click **Open Anyway**; on Windows, click **More info → Run anyway** in SmartScreen. Details are in the [README](https://github.com/ryangswe/plica#install).
+A downloaded copy isn't notarized or signed, so the first launch shows a warning. On macOS, open Plica once, then go to **System Settings → Privacy & Security** and click **Open Anyway**; on Windows, click **More info → Run anyway** in SmartScreen. Details are in the [README](https://github.com/ryangswe/plica#install).
 `;
 }
 
